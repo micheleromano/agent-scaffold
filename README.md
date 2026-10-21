@@ -16,11 +16,24 @@ uv run agent-scaffold init path/to/project
 | `.claude/settings.json` | Allows your test/lint/dev commands, denies reading `.env`, wires up hooks |
 | `.claude/rules/*.md` | Code-style, testing and API rules, each scoped with `paths:` to the files they cover |
 | `.claude/skills/review/SKILL.md` | A `/review` command for the current diff |
-| `.claude/agents/*.md` | Code reviewer, security auditor and test writer subagents |
+| `.claude/rules/humane-design.md` | Always: the Center for Humane Technology's principles as concrete guardrails (see below) |
+| `.claude/agents/humane-design-reviewer.md` | Always: reviews a diff against all seven principles |
+| `.claude/agents/*.md` | Optional code reviewer, security auditor and test writer subagents |
 | `.claude/hooks/*.py` | Block destructive shell commands; format files after every edit |
 | `.gitignore` | Adds `CLAUDE.local.md` and `.claude/settings.local.json` (merged, never replaced) |
 
 Formats follow the current [Claude Code docs](https://code.claude.com/docs). Custom commands now live in skills, and hooks are configured in `settings.json`, so there is no separate `commands/` directory.
+
+## Humane design guardrails
+
+Every project gets guardrails adapted from the Center for Humane Technology's [Principles of Humane Technology](https://www.humanetech.com/humane-product-design). The seven principles are values, so the rule turns each one into something Claude can act on:
+
+- **What gets built:** flag dark patterns (infinite scroll, streaks, false urgency, hard opt-outs) before adding them; pair engagement analytics with a user-outcome metric; minimal data with easy export and deletion; WCAG 2.2 AA; label AI-generated and ranked content.
+- **How Claude works with you:** ask before irreversible or outward-facing actions, explain trade-offs, stay in scope, and say what was and wasn't verified.
+
+Claude names a conflict and suggests an alternative instead of refusing; you decide. The `humane-design-reviewer` subagent checks a diff against all seven principles.
+
+They are always on, not an interview question: the "how Claude works with you" half applies to every project, and the product half costs a few hundred tokens of context in projects with nothing user-facing. To opt out, delete the files; that should be a deliberate choice.
 
 ## Any stack
 

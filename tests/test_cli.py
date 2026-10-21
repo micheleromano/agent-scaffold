@@ -98,6 +98,7 @@ def test_interview_builds_answers_and_saves_them(
     assert data["extensions"] == ["ex", "exs"]
     assert data["test_cmd"] == "mix test"
     assert data["format_on_edit"] is True
+    assert (project / ".claude/rules/humane-design.md").exists()
     assert (project / ".claude/hooks/format_on_edit.py").exists()
     assert next(replies, None) is None, "interview asked fewer questions than scripted"
 

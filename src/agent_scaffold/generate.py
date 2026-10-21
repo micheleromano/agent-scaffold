@@ -82,6 +82,9 @@ def generate(a: Answers) -> list[GeneratedFile]:
         GeneratedFile(".claude/rules/code-style.md", _render("rules/code-style.md.j2", a)),
         GeneratedFile(".claude/rules/testing.md", _render("rules/testing.md.j2", a)),
         GeneratedFile(".claude/skills/review/SKILL.md", _render("skills/review.md.j2", a)),
+        # Humane design guardrails are always on; see README.
+        GeneratedFile(".claude/rules/humane-design.md", _render("rules/humane-design.md.j2", a)),
+        GeneratedFile(".claude/agents/humane-design-reviewer.md", _render("agents/humane-design-reviewer.md.j2", a)),
         GeneratedFile(".gitignore", "\n".join(GITIGNORE_LINES) + "\n", merge_lines=True),
     ]
     if a.mcp_servers:

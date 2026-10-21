@@ -19,6 +19,8 @@ def test_full_setup_writes_every_file() -> None:
         ".claude/rules/testing.md",
         ".claude/rules/api-conventions.md",
         ".claude/skills/review/SKILL.md",
+        ".claude/rules/humane-design.md",
+        ".claude/agents/humane-design-reviewer.md",
         ".claude/agents/code-reviewer.md",
         ".claude/agents/security-auditor.md",
         ".claude/hooks/block_dangerous.py",
@@ -35,6 +37,8 @@ def test_minimal_setup_writes_only_the_core_files() -> None:
         ".claude/rules/code-style.md",
         ".claude/rules/testing.md",
         ".claude/skills/review/SKILL.md",
+        ".claude/rules/humane-design.md",
+        ".claude/agents/humane-design-reviewer.md",
     }
 
 
@@ -132,3 +136,19 @@ def test_gitignore_is_merged_not_replaced() -> None:
     gitignore = next(f for f in generate(make_answers()) if f.path == ".gitignore")
     assert gitignore.merge_lines
     assert gitignore.content.splitlines() == ["CLAUDE.local.md", ".claude/settings.local.json"]
+
+
+def test_humane_design_rule_is_always_generated_and_loaded() -> None:
+    assert ".claude/rules/humane-design.md" in files_by_path(Answers.from_dict(MINIMAL))
+    rule = files_by_path(make_answers())[".claude/rules/humane-design.md"]
+    # No `paths:` frontmatter, so Claude Code loads it every session rather than per file.
+    assert not rule.startswith("---")
+    assert "https://www.humanetech.com/humane-product-design" in rule
+    assert "## How the agent works with people" in rule
+
+
+def test_humane_design_reviewer_covers_all_seven_principles() -> None:
+    agent = files_by_path(make_answers(agents=[]))[".claude/agents/humane-design-reviewer.md"]
+    assert frontmatter(agent)["tools"] == "Read, Glob, Grep"
+    for n in range(1, 8):
+        assert f"\n{n}. **" in agent
