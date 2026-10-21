@@ -1,0 +1,18 @@
+{
+  "name": "agent-scaffold",
+  "description": "Interview-driven CLI (and soon a web app) that generates a project's Claude Code setup: CLAUDE.md, settings, MCP, rules, skills, subagents and hooks.",
+  "stacks": ["python"],
+  "frameworks": "Typer, questionary, Jinja2, pytest; uv for packaging",
+  "architecture": "models.py holds the Answers dataclass and the catalogs (stacks, MCP servers, agents). generate.py is a pure function Answers -> list[GeneratedFile] that renders Jinja2 templates in templates/. writer.py plans and applies changes to disk (create / merge / skip / overwrite). cli.py runs the questionary interview and the Typer command. The planned FastAPI service and Next.js wizard reuse generate.py unchanged.",
+  "conventions": "",
+  "install_cmd": "uv sync",
+  "dev_cmd": "uv run agent-scaffold",
+  "test_cmd": "uv run pytest",
+  "lint_cmd": "uv run ruff check .",
+  "format_cmd": "uv run ruff format",
+  "has_api": false,
+  "mcp_servers": [],
+  "agents": ["code-reviewer", "test-writer"],
+  "block_dangerous": true,
+  "format_on_edit": true
+}

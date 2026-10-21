@@ -1,0 +1,134 @@
+import json
+
+import pytest
+
+from agent_scaffold.generate import generate
+from agent_scaffold.models import AGENTS, MCP_SERVERS, STACKS, Answers
+
+from .helpers import MINIMAL, files_by_path, frontmatter, frontmatter_list, make_answers
+
+
+def test_full_setup_writes_every_file() -> None:
+    assert set(files_by_path(make_answers())) == {
+        "CLAUDE.md",
+        "CLAUDE.local.md",
+        ".mcp.json",
+        ".gitignore",
+        ".claude/settings.json",
+        ".claude/rules/code-style.md",
+        ".claude/rules/testing.md",
+        ".claude/rules/api-conventions.md",
+        ".claude/skills/review/SKILL.md",
+        ".claude/agents/code-reviewer.md",
+        ".claude/agents/security-auditor.md",
+        ".claude/hooks/block_dangerous.py",
+        ".claude/hooks/format_on_edit.py",
+    }
+
+
+def test_minimal_setup_writes_only_the_core_files() -> None:
+    assert set(files_by_path(Answers.from_dict(MINIMAL))) == {
+        "CLAUDE.md",
+        "CLAUDE.local.md",
+        ".gitignore",
+        ".claude/settings.json",
+        ".claude/rules/code-style.md",
+        ".claude/rules/testing.md",
+        ".claude/skills/review/SKILL.md",
+    }
+
+
+@pytest.mark.parametrize("stack", list(STACKS))
+def test_every_preset_renders_valid_files(stack: str) -> None:
+    preset = STACKS[stack]
+    answers = make_answers(
+        stacks=[stack],
+        test_cmd=preset.test,
+        lint_cmd=preset.lint,
+        format_cmd=preset.format,
+        format_on_edit=bool(preset.format),
+        agents=list(AGENTS),
+        mcp_servers=list(MCP_SERVERS),
+    )
+    files = files_by_path(answers)
+    json.loads(files[".claude/settings.json"])
+    json.loads(files[".mcp.json"])
+    assert frontmatter_list(files[".claude/rules/code-style.md"], "paths") == list(preset.globs)
+    assert frontmatter_list(files[".claude/rules/testing.md"], "paths") == list(preset.test_globs)
+    for path, content in files.items():
+        assert "TODO" not in content or path in ("CLAUDE.md", "CLAUDE.local.md"), path
+        if path.endswith(".py"):
+            compile(content, path, "exec")
+
+
+def test_custom_extensions_without_a_preset() -> None:
+    files = files_by_path(Answers.from_dict(MINIMAL))
+    assert "- *.ex files" in files["CLAUDE.md"]
+    assert frontmatter_list(files[".claude/rules/code-style.md"], "paths") == ["**/*.ex"]
+    assert frontmatter_list(files[".claude/rules/testing.md"], "paths") == ["**/*test*.ex", "**/*spec*.ex"]
+
+
+def test_empty_commands_are_left_out() -> None:
+    files = files_by_path(Answers.from_dict(MINIMAL))
+    assert files["CLAUDE.md"].startswith("# tiny\n\n## Stack\n\n- *.ex files\n\n## Architecture\n")
+    assert json.loads(files[".claude/settings.json"])["permissions"]["allow"] == []
+    assert "Run `" not in files[".claude/skills/review/SKILL.md"]
+
+
+def test_settings_json_permissions_and_hooks() -> None:
+    settings = json.loads(files_by_path(make_answers())[".claude/settings.json"])
+    assert settings["$schema"] == "https://json.schemastore.org/claude-code-settings.json"
+    assert settings["permissions"]["allow"] == [
+        "Bash(npm test)",
+        "Bash(npm test *)",
+        "Bash(npm run lint)",
+        "Bash(npm run lint *)",
+    ]
+    assert "Read(./.env)" in settings["permissions"]["deny"]
+    pre, post = settings["hooks"]["PreToolUse"][0], settings["hooks"]["PostToolUse"][0]
+    assert pre["matcher"] == "Bash"
+    assert pre["hooks"][0]["command"] == 'python3 "${CLAUDE_PROJECT_DIR}/.claude/hooks/block_dangerous.py"'
+    assert post["matcher"] == "Edit|Write"
+
+
+def test_settings_json_has_no_hooks_key_when_none_chosen() -> None:
+    settings = json.loads(
+        files_by_path(make_answers(block_dangerous=False, format_on_edit=False))[".claude/settings.json"]
+    )
+    assert "hooks" not in settings
+
+
+def test_mcp_json_lists_selected_servers() -> None:
+    servers = json.loads(files_by_path(make_answers())[".mcp.json"])["mcpServers"]
+    assert set(servers) == {"github", "sentry"}
+    assert servers["github"] == {
+        "type": "http",
+        "url": "https://api.githubcopilot.com/mcp/",
+        "headers": {"Authorization": "Bearer ${GITHUB_PAT}"},
+    }
+
+
+def test_every_remote_mcp_server_declares_its_type() -> None:
+    # A `url` without `type` is read as a stdio server and fails to load.
+    for server in MCP_SERVERS.values():
+        assert "url" not in server.config or server.config["type"] in ("http", "sse")
+
+
+def test_local_notes_list_required_env_vars() -> None:
+    assert "GITHUB_PAT" in files_by_path(make_answers())["CLAUDE.local.md"]
+    assert "environment variables" not in files_by_path(make_answers(mcp_servers=["sentry"]))["CLAUDE.local.md"]
+
+
+@pytest.mark.parametrize("name", ["acme: ordering", 'quote "this"', "multi # hash"])
+def test_frontmatter_survives_awkward_project_names(name: str) -> None:
+    files = files_by_path(make_answers(name=name, agents=list(AGENTS)))
+    for path in [f".claude/agents/{key}.md" for key in AGENTS] + [".claude/skills/review/SKILL.md"]:
+        meta = frontmatter(files[path])
+        assert name in json.loads(meta["description"]), path
+        assert meta["name"] in (*AGENTS, "review")
+
+
+def test_gitignore_is_merged_not_replaced() -> None:
+    gitignore = next(f for f in generate(make_answers()) if f.path == ".gitignore")
+    assert gitignore.merge_lines
+    assert gitignore.content.splitlines() == ["CLAUDE.local.md", ".claude/settings.local.json"]

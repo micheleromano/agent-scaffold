@@ -1,0 +1,6 @@
+# API conventions
+
+- Validate every request body and parameter at the boundary.
+- Return errors in one consistent shape, with a machine-readable code and a human-readable message.
+- Never change the shape of an existing response without a version bump or a migration plan.
+- Document every new endpoint next to its handler.

@@ -1,0 +1,44 @@
+# {{ a.name }}
+
+{% if a.description %}
+{{ a.description }}
+
+{% endif %}
+## Stack
+
+{% for language in a.languages %}
+- {{ language }}
+{% endfor %}
+{% if a.frameworks %}
+- Frameworks and libraries: {{ a.frameworks }}
+{% endif %}
+
+{% if a.install_cmd or a.dev_cmd or a.test_cmd or a.lint_cmd or a.format_cmd %}
+## Commands
+
+{% if a.install_cmd %}
+- Install: `{{ a.install_cmd }}`
+{% endif %}
+{% if a.dev_cmd %}
+- Run locally: `{{ a.dev_cmd }}`
+{% endif %}
+{% if a.test_cmd %}
+- Test: `{{ a.test_cmd }}`
+{% endif %}
+{% if a.lint_cmd %}
+- Lint: `{{ a.lint_cmd }}`
+{% endif %}
+{% if a.format_cmd %}
+- Format: `{{ a.format_cmd }}`
+{% endif %}
+
+{% endif %}
+## Architecture
+
+{{ a.architecture or "TODO: describe the main parts of the system and how they fit together." }}
+
+## Conventions
+
+{{ a.conventions or "TODO: list the conventions a new contributor gets wrong most often." }}
+
+Detailed rules live in `.claude/rules/` and load when Claude works on matching files.

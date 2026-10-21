@@ -1,0 +1,56 @@
+[project]
+name = "agent-scaffold"
+version = "0.1.0"
+description = "Interview-driven setup of Claude Code project files: CLAUDE.md, settings, MCP, rules, skills, agents and hooks."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+dependencies = [
+    "jinja2>=3.1.6",
+    "questionary>=2.1.1",
+    "typer>=0.27.3",
+]
+
+[project.scripts]
+agent-scaffold = "agent_scaffold.cli:app"
+
+[build-system]
+requires = ["uv_build>=0.13.4,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.1",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # import sorting
+    "N",       # pep8 naming
+    "UP",      # modern syntax for the target version
+    "B",       # likely bugs
+    "SIM",     # simplifications
+    "PT",      # pytest style
+    "RUF",     # ruff-specific
+    "PTH",     # pathlib over os.path
+    "S",       # security (bandit)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S603"]  # asserts and subprocess are what tests do
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=agent_scaffold --cov-report=term-missing"

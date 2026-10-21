@@ -1,0 +1,9 @@
+# Local notes (not committed)
+
+Personal, machine-specific context for {{ a.name }}. This file is gitignored.
+
+- Local URLs: TODO (e.g. http://localhost:3000)
+- Test accounts or seed data: TODO
+{% if env_vars %}
+- MCP servers in `.mcp.json` expect these environment variables: {{ env_vars | join(", ") }}
+{% endif %}

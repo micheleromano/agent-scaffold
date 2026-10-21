@@ -1,0 +1,15 @@
+---
+paths:
+{% for g in a.test_globs %}
+  - "{{ g }}"
+{% endfor %}
+---
+
+# Testing
+
+{% if a.test_cmd %}
+- Run tests with `{{ a.test_cmd }}`; run the relevant tests after every change.
+{% endif %}
+- Every bug fix gets a test that fails without the fix.
+- Test behavior through public interfaces, not implementation details.
+- Never weaken or delete an assertion to make a test pass; report the failure instead.

@@ -1,0 +1,17 @@
+---
+paths:
+{% for g in a.globs %}
+  - "{{ g }}"
+{% endfor %}
+---
+
+# Code style
+
+- Match the style of the surrounding code: naming, comment density, file layout.
+{% if a.lint_cmd %}
+- Code must pass `{{ a.lint_cmd }}` before a task is done.
+{% endif %}
+{% if a.format_cmd %}
+- Formatting is owned by `{{ a.format_cmd }}`; don't hand-format.
+{% endif %}
+- Prefer small, focused functions and descriptive names over comments that restate the code.
