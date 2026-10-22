@@ -171,12 +171,21 @@ def test_save_answers_option_writes_a_copy(monkeypatch: pytest.MonkeyPatch, proj
     "previous",
     [
         make_answers(architecture="Next.js calls FastAPI.", install_cmd="npm ci", lint_cmd=""),
-        Answers.from_dict({**MINIMAL, "extensions": ["ex", "exs"], "test_cmd": "mix test"}),
+        make_answers(stacks=["go"], test_cmd="", lint_cmd="go vet ./...", format_cmd="", format_on_edit=False),
         Answers.from_dict({"name": "idea", "description": "An idea.", "stack_undecided": True, "agents": []}),
     ],
 )
 def test_pressing_enter_through_a_prefilled_interview_keeps_every_answer(previous: Answers) -> None:
     assert questions.interview("folder-name", previous) == previous
+
+
+@pytest.mark.usefixtures("press_enter_everywhere")
+def test_editing_turns_on_the_safety_hook_and_drops_unlisted_languages() -> None:
+    previous = Answers.from_dict({**MINIMAL, "extensions": ["ex"], "test_cmd": "mix test", "mcp_servers": ["github"]})
+    answers = questions.interview("tiny", previous)
+    assert answers.block_dangerous  # always on now
+    assert answers.mcp_servers == ["github"]  # never asked, but kept
+    assert (answers.stack_undecided, answers.extensions, answers.test_cmd) == (True, [], "")
 
 
 @pytest.mark.usefixtures("press_enter_everywhere")
@@ -210,11 +219,6 @@ def test_switching_from_undecided_to_a_language_suggests_its_preset(monkeypatch:
     previous = Answers.from_dict({"name": "idea", "description": "", "stack_undecided": True})
     monkeypatch.setattr(
         questionary,
-        "confirm",
-        lambda m, default=True, **_kw: FakeQuestion(True if m.startswith("Do you know") else default),
-    )
-    monkeypatch.setattr(
-        questionary,
         "checkbox",
         lambda message, choices, **_kw: FakeQuestion(
             ["go"] if message.startswith("Languages") else [c.value for c in choices if c.checked]
@@ -228,36 +232,32 @@ def test_switching_from_undecided_to_a_language_suggests_its_preset(monkeypatch:
 # --- scripted interviews ------------------------------------------------------------------
 
 
-def test_interview_builds_answers(monkeypatch: pytest.MonkeyPatch, project: Path, tmp_path: Path) -> None:
+def test_interview_builds_answers(monkeypatch: pytest.MonkeyPatch, project: Path) -> None:
     ask = replies(
         "project",  # what are you setting up
         "shop",  # name
         "A shop.",  # description
-        "other",  # role
-        True,  # languages known
-        ["other"],  # languages: "Other (not listed)"
-        "ex, exs",  # its file extensions
-        "Phoenix",  # frameworks
+        "backend",  # role
+        ["python"],  # languages
+        "FastAPI",  # frameworks
         "",  # architecture
-        "",  # conventions
-        "mix deps.get",  # install
-        "mix phx.server",  # dev
-        "mix test",  # test
-        "mix credo",  # lint
-        "mix format",  # format
-        True,  # format on edit
-        ["github"],  # MCP servers
+        "Money is stored in cents; never edit migrations",  # conventions
         ["code-reviewer"],  # agents
-        True,  # block dangerous
     )
     monkeypatch.setattr(ui, "ask", ask)
     result = runner.invoke(app, ["init", str(project), "--yes"])
 
     assert result.exit_code == 0, result.output
     data = json.loads(cli.saved_answers_path(project.resolve()).read_text())
-    assert data["extensions"] == ["ex", "exs"]
+    # Commands come from the language's standard tooling, never from a question.
+    assert (data["test_cmd"], data["lint_cmd"], data["format_cmd"]) == ("pytest", "ruff check .", "ruff format")
     assert data["format_on_edit"] is True
+    assert data["block_dangerous"] is True
+    assert data["mcp_servers"] == []
     assert (project / ".claude/hooks/format_on_edit.py").exists()
+    assert (project / ".claude/hooks/block_dangerous.py").exists()
+    assert not (project / ".mcp.json").exists()
+    assert "claude mcp add --scope project" in (project / "CLAUDE.md").read_text()
     with pytest.raises(StopIteration):
         ask(None)  # every scripted reply was used
 
@@ -265,7 +265,7 @@ def test_interview_builds_answers(monkeypatch: pytest.MonkeyPatch, project: Path
 def test_interview_with_an_undecided_stack_skips_stack_questions(
     monkeypatch: pytest.MonkeyPatch, project: Path
 ) -> None:
-    ask = replies("project", "habit", "A habit tracker for students.", "backend", False, "", "", [], [], True)
+    ask = replies("project", "habit", "A habit tracker for students.", "backend", [], "", "", [])
     monkeypatch.setattr(ui, "ask", ask)
     result = runner.invoke(app, ["init", str(project), "--yes"])
 

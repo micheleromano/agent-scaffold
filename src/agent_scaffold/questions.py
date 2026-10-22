@@ -12,10 +12,7 @@ import typer
 
 from . import draft, ui
 from .detect import Detected, detect
-from .models import AGENTS, LAYOUTS, MCP_SERVERS, ROLES, STACKS, Answers, Service, Stack, Workspace
-
-# The "Other (not listed)" language choice, which then asks for file extensions.
-OTHER_LANGUAGE = "other"
+from .models import AGENTS, LAYOUTS, ROLES, STACKS, Answers, Service, Workspace
 
 # Drafting with Cohere is on when this key is set (and the optional `cohere` package is installed).
 API_KEY_ENV = "CO_API_KEY"
@@ -34,8 +31,29 @@ def _default_stacks(previous: Answers | None, role: str) -> tuple[str, ...]:
     return (default,) if default else ()
 
 
+def _commands(p: Answers | None, stacks: list[str]) -> dict[str, str]:
+    """The project's commands, never asked: kept from the starting answers (the repository, a Cohere draft or the
+    previous run) while the languages are the same, otherwise the first language's standard tooling."""
+    if p and stacks and p.stacks == stacks:
+        return {
+            "install_cmd": p.install_cmd,
+            "dev_cmd": p.dev_cmd,
+            "test_cmd": p.test_cmd,
+            "lint_cmd": p.lint_cmd,
+            "format_cmd": p.format_cmd,
+        }
+    preset = STACKS[stacks[0]] if stacks else None
+    return {
+        "install_cmd": "",
+        "dev_cmd": "",
+        "test_cmd": preset.test if preset else "",
+        "lint_cmd": preset.lint if preset else "",
+        "format_cmd": preset.format if preset else "",
+    }
+
+
 def _project_questions(default_name: str, p: Answers | None, noun: str = "project") -> dict[str, Any]:
-    """Everything about one codebase: what it is, its stack and its commands. With `p`, answers start pre-filled."""
+    """Everything about one codebase: what it is and its stack. With `p`, answers start pre-filled."""
     name = ui.ask(questionary.text(f"{noun.capitalize()} name:", default=p.name if p else default_name))
     description = ui.ask(
         questionary.text("What does it do, and who is it for? (a sentence or two):", default=p.description if p else "")
@@ -47,38 +65,14 @@ def _project_questions(default_name: str, p: Answers | None, noun: str = "projec
             default=p.role if p else "other",
         )
     )
-    stack_undecided = not ui.ask(
-        questionary.confirm(
-            "Do you know which languages it will use? (No: Claude helps you choose later with /choose-stack)",
-            default=not p.stack_undecided if p else True,
+    stacks: list[str] = ui.ask(
+        questionary.checkbox(
+            "Languages (tick none if it isn't decided or isn't listed: Claude helps you choose with /choose-stack):",
+            choices=_choices(STACKS, lambda s: s.label, checked=_default_stacks(p, role)),
         )
     )
-    stacks: list[str] = []
-    primary: Stack | None = None
-    extensions_text = frameworks = install_cmd = dev_cmd = test_cmd = lint_cmd = format_cmd = ""
-    format_on_edit = False
-    if not stack_undecided:
-        picked = ui.ask(
-            questionary.checkbox(
-                "Languages:",
-                choices=[
-                    *_choices(STACKS, lambda s: s.label, checked=_default_stacks(p, role)),
-                    questionary.Choice("Other (not listed)", value=OTHER_LANGUAGE, checked=bool(p and p.extensions)),
-                ],
-                validate=lambda v: bool(v) or "Pick at least one",
-            )
-        )
-        stacks = [k for k in picked if k != OTHER_LANGUAGE]
-        if OTHER_LANGUAGE in picked:
-            # Rules and the format hook are scoped by file extension, so an unlisted language needs its own.
-            extensions_text = ui.ask(
-                questionary.text(
-                    "Which file extensions does it use? (e.g. ex, exs for Elixir; html, css for a static site):",
-                    default=", ".join(p.extensions) if p else "",
-                    validate=lambda v: bool(v.strip()) or "Enter at least one extension",
-                )
-            )
-        primary = STACKS[stacks[0]] if stacks else None
+    frameworks = ""
+    if stacks:
         frameworks = ui.ask(
             questionary.text("Main frameworks and libraries, names only (optional):", default=p.frameworks if p else "")
         )
@@ -92,65 +86,31 @@ def _project_questions(default_name: str, p: Answers | None, noun: str = "projec
             default=p.conventions if p else "",
         )
     )
-    if not stack_undecided:
-        # Keep earlier commands exactly (even blank ones); otherwise suggest the first language's preset.
-        kept = p if p and not p.stack_undecided else None
-        install_cmd = ui.ask(questionary.text("Install command (optional):", default=kept.install_cmd if kept else ""))
-        dev_cmd = ui.ask(questionary.text("Run-locally command (optional):", default=kept.dev_cmd if kept else ""))
-        test_cmd = ui.ask(
-            questionary.text("Test command:", default=kept.test_cmd if kept else primary.test if primary else "")
-        )
-        lint_cmd = ui.ask(
-            questionary.text("Lint command:", default=kept.lint_cmd if kept else primary.lint if primary else "")
-        )
-        format_cmd = ui.ask(
-            questionary.text(
-                "Format command (gets the file path appended):",
-                default=kept.format_cmd if kept else primary.format if primary else "",
-            )
-        )
-        format_on_edit = bool(format_cmd) and ui.ask(
-            questionary.confirm(
-                "Add a hook that formats files after Claude edits them?", default=p.format_on_edit if p else True
-            )
-        )
+    commands = _commands(p, stacks)
     return {
         "name": name,
         "description": description,
         "role": role,
-        "stack_undecided": stack_undecided,
+        "stack_undecided": not stacks,
         "stacks": stacks,
-        "extensions": extensions_text.split(","),
         "frameworks": frameworks,
         "architecture": architecture,
         "conventions": conventions,
-        "install_cmd": install_cmd,
-        "dev_cmd": dev_cmd,
-        "test_cmd": test_cmd,
-        "lint_cmd": lint_cmd,
-        "format_cmd": format_cmd,
-        "format_on_edit": format_on_edit,
+        **commands,
+        # Formatting after each edit is standard practice wherever there's a formatter.
+        "format_on_edit": bool(commands["format_cmd"]),
     }
 
 
 def _shared_questions(p: Answers | Workspace | None, default_agents: tuple[str, ...]) -> dict[str, Any]:
-    mcp_servers = ui.ask(
-        questionary.checkbox(
-            "MCP servers to connect:",
-            choices=_choices(MCP_SERVERS, lambda m: m.label, checked=tuple(p.mcp_servers) if p else ()),
-        )
-    )
+    """The one choice every project and workspace makes. MCP servers are added when they're needed (see CLAUDE.md),
+    and the hook that blocks destructive commands is always on."""
     agents = ui.ask(
         questionary.checkbox(
             "Subagents:", choices=_choices(AGENTS, str, checked=tuple(p.agents) if p else default_agents)
         )
     )
-    block_dangerous = ui.ask(
-        questionary.confirm(
-            "Add a hook that blocks destructive shell commands?", default=p.block_dangerous if p else True
-        )
-    )
-    return {"mcp_servers": mcp_servers, "agents": agents, "block_dangerous": block_dangerous}
+    return {"mcp_servers": list(p.mcp_servers) if p else [], "agents": agents, "block_dangerous": True}
 
 
 def _scan(root: Path) -> Detected:
@@ -180,9 +140,7 @@ def _show_draft(answers: Answers, reason: str) -> None:
     ui.show(answers, shared=False)
     if reason:
         typer.echo(f"\n  Why these languages: {reason}")
-        typer.echo(
-            '  To weigh other stacks with Claude instead, answer No to "Do you know which languages it will use?".'
-        )
+        typer.echo("  To weigh other stacks with Claude instead, untick every language and use /choose-stack.")
     typer.secho(
         "\nEach question below starts with these answers. Enter keeps one, or type over it.\n", fg=typer.colors.GREEN
     )

@@ -272,30 +272,22 @@ def test_init_a_workspace_from_the_interview(monkeypatch: pytest.MonkeyPatch, tm
             "backend",  # service name
             "",  # description
             "backend",  # role
-            True,  # languages known
             ["typescript"],  # languages
             "",  # frameworks
             "",  # architecture
             "",  # conventions
-            "",  # install
-            "",  # dev
-            "npm test",  # test
-            "",  # lint
-            "",  # format
             True,  # add another service
             "llm",  # service folder
             "llm",  # service name
             "",  # description
             "llm",  # role
-            False,  # languages known
+            [],  # languages: not decided
             "",  # architecture
             "",  # conventions
             False,  # add another service
             "",  # how they talk
             "",  # contracts
-            [],  # MCP servers
             ["code-reviewer"],  # agents
-            True,  # block dangerous
             True,  # write these files
         ),
     )
@@ -329,7 +321,7 @@ def test_add_service_updates_the_manifest_and_the_services_table(
     monkeypatch.setattr(
         ui,
         "ask",
-        replies("data", "data", "", "data", True, ["python"], "", "", "", "", "", "pytest", "", "", True),
+        replies("data", "data", "", "data", ["python"], "", "", "", True),
     )
     result = runner.invoke(app, ["add-service", "data", "--workspace", str(root)])
 
@@ -415,7 +407,7 @@ def test_interview_can_skip_services(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         ui,
         "ask",
-        replies("acme", "", "monorepo", False, "", "", [], ["code-reviewer"], True),
+        replies("acme", "", "monorepo", False, "", "", ["code-reviewer"]),
     )
     ws = questions.workspace_interview("acme")
     assert ws.services == []
@@ -430,7 +422,7 @@ def test_enter_through_an_empty_workspace_keeps_it_empty() -> None:
 
 def test_first_service_added_later_fills_in_the_table(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     write_all(tmp_path, generate_workspace(make_workspace(services=[])))
-    monkeypatch.setattr(ui, "ask", replies("llm", "llm", "", "llm", False, "", "", True))
+    monkeypatch.setattr(ui, "ask", replies("llm", "llm", "", "llm", [], "", "", True))
     result = runner.invoke(app, ["add-service", "llm", "--workspace", str(tmp_path)])
 
     assert result.exit_code == 0, result.output

@@ -28,7 +28,6 @@ SCHEMA: dict[str, Any] = {
         "role": {"type": "string", "enum": list(ROLES)},
         "languages_known": {"type": "boolean"},
         "stacks": {"type": "array", "items": {"type": "string", "enum": list(STACKS)}},
-        "extensions": {"type": "array", "items": {"type": "string"}},
         "frameworks": {"type": "array", "items": {"type": "string"}},
         "conventions": {"type": "array", "items": {"type": "string"}},
         **{name: {"type": "string"} for name in _TEXT_FIELDS},
@@ -37,7 +36,6 @@ SCHEMA: dict[str, Any] = {
         "role",
         "languages_known",
         "stacks",
-        "extensions",
         "frameworks",
         "conventions",
         *_TEXT_FIELDS,
@@ -53,11 +51,10 @@ Fields:
 {roles}
 - languages_known: true when the description or repository names the languages, or when the kind of project \
 makes one stack a common, sensible choice (e.g. a web app: typescript; a data pipeline or an LLM service: python). \
-False only when the description is too vague to suggest any.
+False when the description is too vague to suggest any, or the language isn't one of the stacks below.
 - stacks: the languages, from these keys: {stacks}. Empty when languages_known is false.
 - stack_reason: when you suggest languages that the description and repository don't state, one short sentence \
 on why they fit this project. Otherwise empty.
-- extensions: file extensions (without a dot) only for languages not covered by stacks, e.g. ["ex", "exs"].
 - frameworks: main frameworks and libraries, names only. For an existing repository, use its own. For a new \
 project with languages, suggest the usual main ones for that stack and kind of project. Never include version \
 numbers.
@@ -109,7 +106,6 @@ def from_detected(name: str, description: str, detected: Detected) -> Answers | 
         description or detected.description,
         role="other",
         stacks=detected.stacks,
-        extensions=[],
         frameworks=detected.frameworks,
         architecture="",
         conventions=[],
@@ -138,7 +134,6 @@ def parse(reply: str, name: str, description: str, detected: Detected) -> Answer
         description,
         role=text("role") if text("role") in ROLES else "other",
         stacks=stacks if known or detected.stacks else [],
-        extensions=[e for e in items("extensions") if e.isalnum()] if known else [],
         frameworks=items("frameworks"),
         architecture=text("architecture"),
         conventions=items("conventions"),
@@ -160,13 +155,12 @@ def _answers(
     *,
     role: str,
     stacks: list[str],
-    extensions: list[str],
     frameworks: list[str],
     architecture: str,
     conventions: list[str],
     commands: dict[str, str],
 ) -> Answers:
-    undecided = not stacks and not extensions
+    undecided = not stacks
     if undecided:
         commands = dict.fromkeys(commands, "")
     return Answers(
@@ -175,7 +169,6 @@ def _answers(
         role=role,
         stack_undecided=undecided,
         stacks=stacks,
-        extensions=extensions,
         frameworks=", ".join(frameworks),
         architecture=architecture,
         conventions="; ".join(conventions),

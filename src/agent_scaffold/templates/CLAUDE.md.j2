@@ -9,6 +9,7 @@
 - **Stack not chosen yet:** run `/choose-stack` before writing application code.
 {% endif %}
 - **Skills:** `/plan` before building anything non-trivial, `/review` to check the current changes, `/ship` to test, commit and open a PR, `/ci` to run the checks on GitHub on every push.
+- **MCP servers:** connect a tool such as GitHub, Sentry or a browser when the work needs it, with `claude mcp add --scope project` (it writes `.mcp.json`, which is shared through git). Ask the user before adding one.
 - **Subagents** in `.claude/agents/`: `humane-design-reviewer` for anything people see or use{% for key in a.agents %}, `{{ key }}`{% endfor %}.
 {% if a.block_dangerous or a.format_on_edit %}
 - **Hooks** in `.claude/hooks/`{% if a.block_dangerous %} block destructive shell commands{% endif %}{% if a.block_dangerous and a.format_on_edit %} and{% endif %}{% if a.format_on_edit %} format each file after you edit it{% endif %}. If a hook blocks something, tell the user rather than working around it.

@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/micheleromano/agent-scaffold/actions/workflows/ci.yml/badge.svg)](https://github.com/micheleromano/agent-scaffold/actions/workflows/ci.yml)
 
-Answer a few questions about a project and get a working Claude Code setup: instructions, permissions, MCP connections, path-scoped rules, a review skill, subagents and safety hooks.
+Answer a few questions about a project and get a working Claude Code setup: instructions, permissions, path-scoped rules, a review skill, subagents and safety hooks.
 
 ```
 uv run agent-scaffold init path/to/project
@@ -15,14 +15,13 @@ uv run agent-scaffold init path/to/project
 | `AGENTS.md` | Project overview, stack, commands, architecture, conventions and working principles, in the open [AGENTS.md](https://agents.md) format other coding agents read too |
 | `CLAUDE.md` | Imports `AGENTS.md` (`@AGENTS.md`), then adds what's specific to Claude Code |
 | `CLAUDE.local.md` | Your machine-specific notes; gitignored |
-| `.mcp.json` | Shared MCP servers (GitHub, Sentry, Notion, Slack, Playwright) |
 | `.claude/settings.json` | Allows your test/lint/dev commands, denies reading `.env`, wires up hooks |
 | `.claude/rules/*.md` | Code-style and testing rules scoped with `paths:` to the files they cover, plus conventions for the project's role (see below) |
 | `.claude/skills/*/SKILL.md` | `/plan` before building, `/review` the current diff, `/ship` (checks, review, then commit and PR once you confirm), `/ci` (a GitHub Actions workflow and status badge, using the action versions current when it runs), and `/choose-stack` when the stack isn't decided |
 | `.claude/rules/humane-design.md` | Always: the Center for Humane Technology's principles as concrete guardrails (see below) |
 | `.claude/agents/humane-design-reviewer.md` | Always: reviews a diff against all seven principles |
 | `.claude/agents/*.md` | Optional code reviewer, security auditor and test writer subagents |
-| `.claude/hooks/*.py` | Block destructive shell commands; format files after every edit |
+| `.claude/hooks/*.py` | Always: block destructive shell commands. With a formatter: format each file after Claude edits it |
 | `.gitignore` | Adds `CLAUDE.local.md` and `.claude/settings.local.json` (merged, never replaced) |
 
 Formats follow the current [Claude Code docs](https://code.claude.com/docs). Custom commands now live in skills, and hooks are configured in `settings.json`, so there is no separate `commands/` directory.
@@ -83,15 +82,17 @@ acme/
 - **Each service is set up for its purpose** through its role, and stands alone: settings and skills aren't inherited across repositories, so each service gets its own `.claude/`.
 - **Separate repositories:** the workspace is a small repository whose `.gitignore` excludes the service folders.
 - **Services can come later.** Start with just the goal and no services; the services table says so until the first one is added.
-- **New services follow the blueprint.** `agent-scaffold add-service <folder>` asks for the role, stack and commands, adds the service to the manifest, writes its setup, and refreshes the root services table and `/review` skill. The root `AGENTS.md` tells every agent to add services this way, never by hand.
+- **New services follow the blueprint.** `agent-scaffold add-service <folder>` asks for the role and stack, adds the service to the manifest, writes its setup, and refreshes the root services table and `/review` skill. The root `AGENTS.md` tells every agent to add services this way, never by hand.
 
 Sections that depend on the list of services (the services table, the `/review` service list, each service's "Part of" section) are wrapped in `<!-- agent-scaffold:name -->` markers. `init` and `add-service` refresh what's between them; everything else in the file is yours.
 
 ## Any stack
 
-Presets fill in default test, lint and format commands for TypeScript/JavaScript, Python, Go, Rust, Java/Kotlin, C#, Ruby, PHP and Swift. For any other language, tick "Other (not listed)" and enter its file extensions (e.g. `ex, exs` for Elixir, `html, css` for a static site); rules and hooks are then scoped to those files. Every command can be edited or left blank, and blank answers are left out of the output.
+Presets cover TypeScript/JavaScript, Python, Go, Rust, Java/Kotlin, C#, Ruby, PHP and Swift. The interview never asks for commands: they come from the repository's `package.json` or `pyproject.toml` when there is one, then from a Cohere draft, then from the first language's standard tooling (e.g. `pytest`, `ruff check .`, `ruff format` for Python). Wherever there's a formatter, a hook formats each file after Claude edits it. To change a command later, edit `AGENTS.md`.
 
-Don't know the stack yet? Answer "no" to "Do you know which languages it will use?" and the interview skips the language and command questions. `AGENTS.md` records the stack as not decided, and a `/choose-stack` skill asks Claude to explore the idea with you, propose 2 or 3 stacks with trade-offs, and, once you pick, fill in the stack, commands, rule paths and permissions.
+Stack not decided, or a language that isn't listed? Leave every language unticked. `AGENTS.md` records the stack as not decided, and a `/choose-stack` skill asks Claude to explore the idea with you (or takes the language you already know), propose 2 or 3 stacks with trade-offs, and, once you pick, fill in the stack, commands, rule paths and permissions.
+
+**MCP servers** aren't part of the interview: connect one when the work needs it (`claude mcp add --scope project ...`), and the generated `CLAUDE.md` tells Claude to ask you first. An answers file can still list them under `mcp_servers`. **The hook that blocks destructive shell commands** (deleting `/` or your home folder, force pushes, `git reset --hard`, `git clean -f`, piping a download into a shell, and dropping a table or database) is always installed.
 
 The generated hooks are standard-library Python scripts, so the machine running Claude Code needs `python3` on its PATH (preinstalled on macOS and most Linux distributions).
 
@@ -100,7 +101,7 @@ The generated hooks are standard-library Python scripts, so the machine running 
 The interview doesn't start from a blank page when there's something to go on.
 
 - **Existing repositories:** run it in a folder with a `package.json` or `pyproject.toml` and the questions start with what those files say: the language, package manager (npm, pnpm, yarn, bun, uv, Poetry or pip), install/dev/test/lint/format commands, and well-known frameworks among the dependencies. `go.mod`, `Cargo.toml`, `build.gradle`, `pom.xml`, `Gemfile`, `composer.json` and `Package.swift` mark their stacks too.
-- **Cohere drafts (optional):** with a [Cohere API key](https://dashboard.cohere.com/api-keys) in `CO_API_KEY` and the extra installed (`uv tool install 'agent-scaffold[cohere]'`), the interview first asks you to describe the project in a few sentences. Cohere's `command-a-plus-05-2026` model drafts the role, languages, frameworks, architecture, project-specific conventions and commands, using [structured outputs](https://docs.cohere.com/docs/structured-outputs) so the role and languages can only be ones the tool knows. It shows the draft first, so you can see what it suggested, then each question starts with it; Enter keeps an answer, or you type over it. For a new project whose kind makes a stack an easy pick (a web app, an LLM service), it suggests languages and says why; answer No to "Do you know which languages it will use?" to weigh options with `/choose-stack` instead. A description too vague to go on leaves the stack undecided.
+- **Cohere drafts (optional):** with a [Cohere API key](https://dashboard.cohere.com/api-keys) in `CO_API_KEY` and the extra installed (`uv tool install 'agent-scaffold[cohere]'`), the interview first asks you to describe the project in a few sentences. Cohere's `command-a-plus-05-2026` model drafts the role, languages, frameworks, architecture, project-specific conventions and commands, using [structured outputs](https://docs.cohere.com/docs/structured-outputs) so the role and languages can only be ones the tool knows. It shows the draft first, so you can see what it suggested, then each question starts with it; Enter keeps an answer, or you type over it. For a new project whose kind makes a stack an easy pick (a web app, an LLM service), it suggests languages and says why; untick every language to weigh options with `/choose-stack` instead. A description too vague to go on leaves the stack undecided.
   - Only your description and the names of dependencies and commands are sent, never file contents. The repository's own commands win over the model's suggestions.
   - Set `AGENT_SCAFFOLD_COHERE_MODEL` to use another Command model. If the request fails, the interview carries on without the draft.
 

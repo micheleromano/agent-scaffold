@@ -122,19 +122,14 @@ def test_the_repository_wins_over_the_draft() -> None:
 
 
 def test_unknown_values_from_the_model_are_dropped() -> None:
-    answers = parse(
-        reply(role="wizard", stacks=["cobol", "go"], extensions=["ex", "../x", 3], frameworks="not a list"),
-        "x",
-        "",
-        Detected(),
-    )
-    assert (answers.role, answers.stacks, answers.extensions, answers.frameworks) == ("other", ["go"], ["ex"], "")
+    answers = parse(reply(role="wizard", stacks=["cobol", "go"], frameworks="not a list"), "x", "", Detected())
+    assert (answers.role, answers.stacks, answers.frameworks) == ("other", ["go"], "")
 
 
 def test_undecided_languages_drop_the_commands() -> None:
-    answers = parse(reply(languages_known=False, stacks=["go"], extensions=["ex"]), "x", "an idea", Detected())
+    answers = parse(reply(languages_known=False, stacks=["go"]), "x", "an idea", Detected())
     assert answers.stack_undecided
-    assert (answers.stacks, answers.extensions, answers.test_cmd, answers.format_on_edit) == ([], [], "", False)
+    assert (answers.stacks, answers.test_cmd, answers.format_on_edit) == ([], "", False)
 
 
 def test_an_existing_repo_is_never_undecided() -> None:
@@ -280,7 +275,7 @@ def test_a_suggested_stack_says_why(
     out = capsys.readouterr().out
     assert answers.stacks == ["typescript"]
     assert f"Why these languages: {why}" in out
-    assert 'answer No to "Do you know which languages it will use?"' in out
+    assert "untick every language and use /choose-stack" in out
 
 
 @pytest.mark.parametrize(
