@@ -18,7 +18,7 @@ DEFAULT_MODEL = "command-a-plus-05-2026"
 # Takes the system and user messages, returns the model's JSON reply.
 Drafter = Callable[[str, str], str]
 
-_TEXT_FIELDS = ("architecture", "install_cmd", "dev_cmd", "test_cmd", "lint_cmd", "format_cmd")
+_TEXT_FIELDS = ("stack_reason", "architecture", "install_cmd", "dev_cmd", "test_cmd", "lint_cmd", "format_cmd")
 _COMMANDS = ("install_cmd", "dev_cmd", "test_cmd", "lint_cmd", "format_cmd")
 
 # Cohere's structured outputs keep the reply to this shape; enums keep role and stacks to the tool's catalogs.
@@ -46,24 +46,32 @@ SCHEMA: dict[str, Any] = {
 
 _SYSTEM = """You draft the answers to a setup interview for a software project. The answers configure the files \
 that AI coding agents read (AGENTS.md, CLAUDE.md). The person reviews every answer before anything is written, so \
-leave a field empty rather than guess.
+leave a field empty rather than invent facts about the project.
 
 Fields:
 - role: what the project is for. One of:
 {roles}
-- languages_known: false when the description doesn't make the languages clear and there is no existing code.
+- languages_known: true when the description or repository names the languages, or when the kind of project \
+makes one stack a common, sensible choice (e.g. a web app: typescript; a data pipeline or an LLM service: python). \
+False only when the description is too vague to suggest any.
 - stacks: the languages, from these keys: {stacks}. Empty when languages_known is false.
+- stack_reason: when you suggest languages that the description and repository don't state, one short sentence \
+on why they fit this project. Otherwise empty.
 - extensions: file extensions (without a dot) only for languages not covered by stacks, e.g. ["ex", "exs"].
-- frameworks: main frameworks and libraries, names only. Never include version numbers.
+- frameworks: main frameworks and libraries, names only. For an existing repository, use its own. For a new \
+project with languages, suggest the usual main ones for that stack and kind of project. Never include version \
+numbers.
 - architecture: one or two sentences on how the project is structured, only from what is stated or evident.
 - conventions: at most five project-specific rules an AI coding agent would not guess, taken from the description \
 or the dependencies, e.g. "Load data with react-router loaders and actions, not useEffect". No generic advice such \
 as "write tests" or "keep code clean". Empty when none are evident.
-- install_cmd, dev_cmd, test_cmd, lint_cmd: shell commands. When the repository lists a command, use it exactly. \
-Otherwise suggest the usual command for the chosen stack's standard tooling, or leave it empty.
+- install_cmd, dev_cmd, test_cmd, lint_cmd: shell commands run inside the project: install its dependencies \
+(e.g. "npm install"), run it locally, run its tests, lint it. Never a command that creates or scaffolds a project. \
+When the repository lists a command, use it exactly. Otherwise suggest the usual command for the chosen stack's \
+standard tooling, or leave it empty.
 - format_cmd: formats one file; its path is appended (e.g. "npx prettier --write"). Empty if unsure.
 
-Only use facts from the description and the repository. Never include version numbers anywhere."""
+Never state facts the description and repository don't support. Never include version numbers anywhere."""
 
 
 def system_prompt() -> str:
@@ -136,6 +144,14 @@ def parse(reply: str, name: str, description: str, detected: Detected) -> Answer
         conventions=items("conventions"),
         commands={key: getattr(detected, key) or text(key) for key in _COMMANDS},
     )
+
+
+def stack_reason(reply: str, answers: Answers, detected: Detected) -> str:
+    """Why the model suggested the languages, when they're its suggestion rather than the person's or the repo's."""
+    data = json.loads(reply)
+    reason = data.get("stack_reason") if isinstance(data, dict) else None
+    suggested = not answers.stack_undecided and not detected.stacks
+    return reason.strip() if suggested and isinstance(reason, str) else ""
 
 
 def _answers(

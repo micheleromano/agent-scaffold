@@ -31,6 +31,7 @@ def reply(**overrides: Any) -> str:
         "role": "frontend",
         "languages_known": True,
         "stacks": ["typescript"],
+        "stack_reason": "",
         "extensions": [],
         "frameworks": ["React Router", "HeroUI"],
         "conventions": ["Load data with react-router loaders, not useEffect", "  "],
@@ -56,6 +57,8 @@ def test_schema_offers_only_the_catalogs_and_requires_every_field() -> None:
 
 def test_system_prompt_lists_roles_and_stacks_and_forbids_versions() -> None:
     prompt = system_prompt()
+    assert "a web app: typescript" in prompt
+    assert "\\" not in prompt  # line continuations, not literal backslashes
     assert "- llm: LLM / AI service. Calls language models" in prompt
     assert "- other: Other (library, CLI, tool, ...)\n" in prompt
     assert "python (Python)" in prompt
@@ -258,7 +261,40 @@ def test_the_draft_prefills_the_interview(
     assert answers.test_cmd == "npm run test"  # the repository's command beats the draft's
     assert answers.convention_list == ["Load data with react-router loaders, not useEffect"]
     assert answers.agents == list(ROLES["frontend"].agents)  # shared choices still start from the role
-    assert "Each question below starts with Cohere's suggestion" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "Cohere suggests:\n\n  Project       strava\n" in out
+    assert "  Role          Frontend (web or mobile UI)\n" in out
+    assert "Subagents" not in out  # shared choices aren't part of the draft
+    assert "Why these languages" not in out  # they came from the repository
+    assert "Each question below starts with these answers" in out
+
+
+@pytest.mark.usefixtures("describe")
+def test_a_suggested_stack_says_why(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CO_API_KEY", "key")
+    why = "A web app with a rich UI fits TypeScript and React."
+    monkeypatch.setattr(draft, "cohere_drafter", lambda _k, _m: lambda _s, _u: reply(stack_reason=why))
+    answers = questions.interview("new", root=tmp_path)
+    out = capsys.readouterr().out
+    assert answers.stacks == ["typescript"]
+    assert f"Why these languages: {why}" in out
+    assert 'answer No to "Do you know which languages it will use?"' in out
+
+
+@pytest.mark.parametrize(
+    ("overrides", "detected", "expected"),
+    [
+        ({"stack_reason": " Fits a web UI. "}, Detected(), "Fits a web UI."),
+        ({"stack_reason": "Fits a web UI."}, REPO, ""),  # the repository's languages, not a suggestion
+        ({"stack_reason": "Why", "languages_known": False, "stacks": []}, Detected(), ""),
+        ({"stack_reason": 3}, Detected(), ""),
+    ],
+)
+def test_stack_reason(overrides: dict[str, Any], detected: Detected, expected: str) -> None:
+    text = reply(**overrides)
+    assert draft.stack_reason(text, parse(text, "x", "", detected), detected) == expected
 
 
 @pytest.mark.usefixtures("press_enter_everywhere", "drafts")

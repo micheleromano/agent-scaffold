@@ -38,8 +38,8 @@ def _shared_rows(x: Answers | Workspace) -> list[tuple[str, str]]:
     ]
 
 
-def summarize(x: Answers | Workspace) -> list[tuple[str, str]]:
-    """The answers as label/value rows, leaving out anything blank."""
+def summarize(x: Answers | Workspace, *, shared: bool = True) -> list[tuple[str, str]]:
+    """The answers as label/value rows, leaving out anything blank (and the shared choices when `shared` is False)."""
     if isinstance(x, Workspace):
         rows = [
             ("Workspace", x.name),
@@ -49,7 +49,7 @@ def summarize(x: Answers | Workspace) -> list[tuple[str, str]]:
             *((f"{s.path}/", f"{ROLES[s.answers.role].label} · {_languages(s.answers)}") for s in x.services),
             ("Services talk", x.communication),
             ("Contracts", x.contracts),
-            *_shared_rows(x),
+            *(_shared_rows(x) if shared else []),
         ]
     else:
         rows = [
@@ -61,13 +61,13 @@ def summarize(x: Answers | Workspace) -> list[tuple[str, str]]:
             ("Architecture", x.architecture),
             ("Conventions", "; ".join(x.convention_list)),
             ("Commands", _commands(x)),
-            *_shared_rows(x),
+            *(_shared_rows(x) if shared else []),
         ]
     return [(label, value) for label, value in rows if value]
 
 
-def show(x: Answers | Workspace) -> None:
-    rows = summarize(x)
+def show(x: Answers | Workspace, *, shared: bool = True) -> None:
+    rows = summarize(x, shared=shared)
     width = max(len(label) for label, _ in rows)
     for label, value in rows:
         typer.echo(f"  {label.ljust(width)}  {value}")

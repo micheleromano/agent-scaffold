@@ -175,6 +175,19 @@ def _drafter() -> draft.Drafter | None:
         return None
 
 
+def _show_draft(answers: Answers, reason: str) -> None:
+    typer.secho("\nCohere suggests:\n", bold=True)
+    ui.show(answers, shared=False)
+    if reason:
+        typer.echo(f"\n  Why these languages: {reason}")
+        typer.echo(
+            '  To weigh other stacks with Claude instead, answer No to "Do you know which languages it will use?".'
+        )
+    typer.secho(
+        "\nEach question below starts with these answers. Enter keeps one, or type over it.\n", fg=typer.colors.GREEN
+    )
+
+
 def starting_answers(name: str, root: Path | None, noun: str = "project") -> Answers | None:
     """Answers to start a fresh interview from: what the folder's package.json or pyproject.toml says and, when a
     Cohere API key is set, a draft from the person's description. None when there's nothing to go on."""
@@ -192,16 +205,12 @@ def starting_answers(name: str, root: Path | None, noun: str = "project") -> Ans
     if description and drafter:
         typer.echo("Asking Cohere for a draft...")
         try:
-            answers = draft.parse(
-                drafter(draft.system_prompt(), draft.user_prompt(description, detected)), name, description, detected
-            )
+            reply = drafter(draft.system_prompt(), draft.user_prompt(description, detected))
+            answers = draft.parse(reply, name, description, detected)
         except Exception as e:  # any API, network or format failure: carry on without the draft
             typer.secho(f"Couldn't get a draft ({e}); continuing without it.\n", fg=typer.colors.YELLOW)
         else:
-            typer.secho(
-                "Each question below starts with Cohere's suggestion. Check them: Enter keeps one, or type over it.\n",
-                fg=typer.colors.GREEN,
-            )
+            _show_draft(answers, draft.stack_reason(reply, answers, detected))
             return answers
     if detected:
         typer.echo(f"Found {' and '.join(detected.sources)}: the questions start with what it says.\n")
