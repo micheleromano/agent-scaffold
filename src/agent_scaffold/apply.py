@@ -27,9 +27,13 @@ ACTION_STYLE = {
     "overwrite": ("~", typer.colors.YELLOW),
     "refresh": ("~", typer.colors.YELLOW),
     "merge": ("~", typer.colors.YELLOW),
-    "skip": ("!", typer.colors.RED),
+    "keeping yours": ("=", None),
     "unchanged": ("=", None),
 }
+
+
+def _files(n: int) -> str:
+    return f"{n} file" if n == 1 else f"{n} files"
 
 
 def reader(root: Path) -> Any:
@@ -86,7 +90,7 @@ def apply(files: list[GeneratedFile], root: Path, *, yes: bool, force: bool) -> 
     if not root.exists():
         typer.secho(f"  + {root}/  (new directory)", fg=typer.colors.GREEN)
     for f, action in actions:
-        label = "refresh" if f.path in refresh else action
+        label = "refresh" if f.path in refresh else "keeping yours" if action == "skip" else action
         mark, color = ACTION_STYLE[label]
         typer.secho(f"  {mark} {f.path}" + (f"  ({label})" if label != "create" else ""), fg=color)
     typer.echo()
@@ -100,8 +104,18 @@ def apply(files: list[GeneratedFile], root: Path, *, yes: bool, force: bool) -> 
 
     root.mkdir(parents=True, exist_ok=True)
     write(actions, root)
-    if any(action == "skip" for _, action in actions):
-        typer.echo("\nSkipped files already exist; rerun with --force to overwrite them.")
+    if refresh:
+        typer.echo(
+            f"\nUpdated the agent-scaffold sections of {_files(len(refresh))}; your text around them is unchanged."
+        )
+    kept = sum(action == "skip" for _, action in actions)
+    if kept and yes:
+        typer.echo(
+            f"\nKept {_files(kept)} that already existed with different content. "
+            "Run without --yes to compare each with the generated version and choose."
+        )
+    elif kept:
+        typer.echo(f"\nKept your version of {_files(kept)}.")
     for f in files:
         claude_md = root / f.path
         if f.path.endswith("CLAUDE.md") and AGENTS_IMPORT not in claude_md.read_text().splitlines():

@@ -506,3 +506,21 @@ def test_service_in_its_own_repo_has_a_plain_ci_workflow() -> None:
 def test_enter_through_a_new_workspace_asks_no_service_or_stack_questions() -> None:
     ws = questions.workspace_interview("acme")
     assert ws.services == []
+
+
+def test_refreshing_says_what_changed_without_suggesting_force(
+    workspace_on_disk: tuple[Path, list[GeneratedFile]],
+) -> None:
+    root, _ = workspace_on_disk
+    agents_md = root / "AGENTS.md"
+    agents_md.write_text(agents_md.read_text() + "\nMy notes.\n")
+    (root / "backend" / "CLAUDE.md").write_text("mine\n")
+    ws = make_workspace(goal="A new goal")
+    (root / MANIFEST).write_text(json.dumps(ws.to_dict()))
+    result = runner.invoke(app, ["init", str(root), "--answers", str(root / MANIFEST), "--yes"])
+    assert result.exit_code == 0, result.output
+    assert "Updated the agent-scaffold sections of" in result.output
+    assert "your text around them is unchanged" in result.output
+    assert "backend/CLAUDE.md  (keeping yours)" in result.output
+    assert "--force" not in result.output
+    assert agents_md.read_text().endswith("\nMy notes.\n")

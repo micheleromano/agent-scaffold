@@ -301,6 +301,7 @@ def test_keep_my_claude_md(
     output = run_with(monkeypatch, project, answers_file, "keep", True)
     assert "CLAUDE.md already exists." in output
     assert existing_claude_md.read_text() == "# treesdolisten\n\nA frozen static blog.\n"
+    assert "Kept your version of 1 file." in output
     assert "doesn't import AGENTS.md" in output
 
 
@@ -369,8 +370,10 @@ def test_reports_skipped_files_and_a_missing_import(project: Path, answers_file:
     (project / "CLAUDE.md").write_text("mine\n")
     result = runner.invoke(app, ["init", str(project), "--answers", str(answers_file), "--yes"])
     assert result.exit_code == 0, result.output
-    assert "CLAUDE.md  (skip)" in result.output
-    assert "--force" in result.output
+    assert "CLAUDE.md  (keeping yours)" in result.output
+    assert "Kept 1 file that already existed" in result.output
+    assert "Run without --yes to compare" in result.output
+    assert "--force" not in result.output
     assert "doesn't import AGENTS.md" in result.output
 
 
