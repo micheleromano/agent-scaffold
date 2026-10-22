@@ -11,7 +11,7 @@ from typing import Any
 
 from jinja2 import Environment, PackageLoader, StrictUndefined
 
-from .models import AGENTS, MCP_SERVERS, ROLES, Answers, Workspace
+from .models import AGENTS, MCP_SERVERS, ROLES, STACKS, Answers, Workspace
 
 SETTINGS_SCHEMA = "https://json.schemastore.org/claude-code-settings.json"
 GITIGNORE_LINES = ("CLAUDE.local.md", ".claude/settings.local.json")
@@ -38,7 +38,12 @@ class SystemContext:
 
     name: str
     goal: str
-    root: str  # relative path from the service to the workspace AGENTS.md
+    root_dir: str  # relative path from the service to the workspace root, e.g. "../.."
+    service_path: str  # the service's folder, as recorded in the workspace manifest
+
+    @property
+    def root(self) -> str:
+        return f"{self.root_dir}/AGENTS.md"
 
 
 _env = Environment(  # noqa: S701 - templates render Markdown and Python, never HTML, so autoescape must stay off
@@ -49,6 +54,8 @@ _env = Environment(  # noqa: S701 - templates render Markdown and Python, never 
     keep_trailing_newline=True,
 )
 _env.globals["roles"] = ROLES
+_env.globals["stacks"] = STACKS
+_env.globals["manifest"] = MANIFEST
 _env.filters["cell"] = lambda text: str(text).replace("|", "\\|")
 
 
@@ -149,7 +156,11 @@ def generate(a: Answers, system: SystemContext | None = None) -> list[GeneratedF
         *_shared_files(a),
     ]
     if a.stack_undecided:
-        files.append(GeneratedFile(".claude/skills/choose-stack/SKILL.md", _render("skills/choose-stack.md.j2", a)))
+        files.append(
+            GeneratedFile(
+                ".claude/skills/choose-stack/SKILL.md", _render("skills/choose-stack.md.j2", a, system=system)
+            )
+        )
     if a.role != "other":
         files.append(GeneratedFile(f".claude/rules/{a.role}.md", _render(f"roles/{a.role}.md.j2", a)))
     if a.format_on_edit:
@@ -186,7 +197,7 @@ def generate_workspace(ws: Workspace) -> list[GeneratedFile]:
         *_shared_files(root),
     ]
     for service, answers in services:
-        system = SystemContext(ws.name, ws.goal, "../" * service.depth + "AGENTS.md")
+        system = SystemContext(ws.name, ws.goal, "/".join([".."] * service.depth), service.path)
         files += [replace(f, path=posixpath.join(service.path, f.path)) for f in generate(answers, system)]
     return files
 

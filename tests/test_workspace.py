@@ -452,3 +452,37 @@ def test_add_service_reports_an_invalid_manifest(tmp_path: Path) -> None:
     result = runner.invoke(app, ["add-service", "x", "--workspace", str(tmp_path)])
     assert result.exit_code == 1
     assert f"Invalid {MANIFEST}" in result.output
+
+
+# --- choosing a service's stack later -----------------------------------------------------
+
+
+def test_choose_stack_in_a_workspace_updates_the_blueprint_too() -> None:
+    files = by_path(generate_workspace(make_workspace()))
+    skill = files["services/llm/.claude/skills/choose-stack/SKILL.md"].content
+    assert f"`../../{MANIFEST}`" in skill
+    assert 'whose `path` is `"services/llm"`' in skill
+    assert f"`agent-scaffold init ../.. --answers ../../{MANIFEST} --yes`" in skill
+    assert "`python`" in skill  # the valid stack keys are listed
+    single = by_path(generate(make_answers(stack_undecided=True, stacks=[], format_on_edit=False)))
+    assert MANIFEST not in single[".claude/skills/choose-stack/SKILL.md"].content
+
+
+def test_the_command_choose_stack_runs_refreshes_the_table_and_keeps_edits(
+    workspace_on_disk: tuple[Path, list[GeneratedFile]],
+) -> None:
+    root, _ = workspace_on_disk
+    # What Claude does at the end of /choose-stack: edit the service's files, then its blueprint entry.
+    style = root / "services/llm/.claude/rules/code-style.md"
+    style.write_text('---\npaths:\n  - "**/*.py"\n---\n\n# Code style\n\n- Edited by /choose-stack.\n')
+    manifest = root / MANIFEST
+    data = json.loads(manifest.read_text())
+    llm = next(s for s in data["services"] if s["path"] == "services/llm")
+    llm["answers"].update(stack_undecided=False, stacks=["python"], test_cmd="pytest")
+    manifest.write_text(json.dumps(data, indent=2))
+
+    result = runner.invoke(app, ["init", str(root / "services/llm/../.."), "--answers", str(manifest), "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert "| llm | `services/llm/` | LLM / AI service | Python | `pytest` |" in (root / "AGENTS.md").read_text()
+    assert style.read_text().endswith("- Edited by /choose-stack.\n")

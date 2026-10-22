@@ -26,4 +26,8 @@ The stack for {{ a.name }} isn't chosen yet. Help the user choose it, then updat
      Then add the lint and test commands to the bullets.
    - `.claude/settings.json`: add `"Bash(<command>)"` and `"Bash(<command> *)"` to `permissions.allow` for the test and lint commands.
    - `CLAUDE.md`: remove the "Stack not chosen yet" line.
+{% if system %}
+   - The workspace blueprint, `{{ system.root_dir }}/{{ manifest }}`, which the root services table is built from: in the `services` entry whose `path` is `"{{ system.service_path }}"`, update its `answers` to match. Set `stack_undecided` to `false`; set `stacks` to the chosen languages from {% for key in stacks %}`{{ key }}`{% if not loop.last %}, {% endif %}{% endfor %}, or put file extensions in `extensions` for a language not on that list; and fill `frameworks`, `install_cmd`, `dev_cmd`, `test_cmd`, `lint_cmd` and `format_cmd`. Leave every other field as it is.
+   - Refresh the root services table by running `agent-scaffold init {{ system.root_dir }} --answers {{ system.root_dir }}/{{ manifest }} --yes`. It keeps every existing file and only updates the sections agent-scaffold maintains. If the command isn't installed, tell the user the root table will say "not decided yet" until they run it.
+{% endif %}
 5. Summarize what changed, then ask whether to delete this skill (`.claude/skills/choose-stack/`) now that it's done.
