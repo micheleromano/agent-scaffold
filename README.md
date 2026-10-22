@@ -27,7 +27,7 @@ Formats follow the current [Claude Code docs](https://code.claude.com/docs). Cus
 
 ## One file for every agent
 
-The project context lives in `AGENTS.md`, so Codex, Cursor and other agents that read the format get the same instructions as Claude. `CLAUDE.md` starts with `@AGENTS.md`, which Claude Code needs: it skips a standalone `AGENTS.md` whenever a `CLAUDE.md` or `CLAUDE.local.md` exists ([docs](https://code.claude.com/docs/en/memory)). If your project already has a `CLAUDE.md`, it's left alone and the CLI tells you to add the import line yourself.
+The project context lives in `AGENTS.md`, so Codex, Cursor and other agents that read the format get the same instructions as Claude. `CLAUDE.md` starts with `@AGENTS.md`, which Claude Code needs: it skips a standalone `AGENTS.md` whenever a `CLAUDE.md` or `CLAUDE.local.md` exists ([docs](https://code.claude.com/docs/en/memory)). If your project already has a `CLAUDE.md`, the CLI offers to move it into `AGENTS.md` and add the import for you.
 
 ## How agents work
 
@@ -62,7 +62,7 @@ The generated hooks are standard-library Python scripts, so the machine running 
 
 - **Nothing is written until you confirm.** Every run ends with the list of files it would create, merge or skip, then asks "Write these files?" Say no to just preview.
 - **Your answers are saved** per project folder in `~/.local/state/agent-scaffold/`, never in the project itself. The next run for that folder shows them and asks whether to use them as they are, edit them (every question starts with your previous answer, so Enter keeps it), or start over.
-- Existing files are never overwritten unless you pass `--force`.
+- **Existing files are never overwritten without asking.** For each generated file that already exists with different contents, you choose: keep yours, replace it, or see the diff first. For an existing `CLAUDE.md` there's a fourth option: move it into `AGENTS.md` (followed by the working principles) and replace `CLAUDE.md` with one that imports it, so your instructions reach every agent. `--yes` keeps every existing file; `--force` replaces them all.
 - `--save-answers answers.json` also saves a copy you can share; `--answers answers.json` replays it without the interview. Add `--yes` to write without the confirmation prompt, for scripts.
 
 ## Design

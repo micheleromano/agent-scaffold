@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from agent_scaffold.generate import generate
+from agent_scaffold.generate import adopt_claude_md, can_adopt_claude_md, generate
 from agent_scaffold.models import AGENTS, MCP_SERVERS, STACKS, Answers
 
 from .helpers import MINIMAL, files_by_path, frontmatter, frontmatter_list, make_answers
@@ -236,3 +236,32 @@ def test_undecided_stack_rules_load_everywhere_until_scoped() -> None:
     files = files_by_path(Answers.from_dict(UNDECIDED))
     assert files[".claude/rules/code-style.md"].startswith("# Code style")
     assert files[".claude/rules/testing.md"].startswith("# Testing")
+
+
+MY_CLAUDE_MD = "# treesdolisten\n\nA frozen static blog on Cloudflare Pages.\n"
+
+
+def test_adopting_claude_md_moves_it_into_agents_md_with_the_principles() -> None:
+    files = {f.path: f.content for f in adopt_claude_md(generate(make_answers()), MY_CLAUDE_MD)}
+    assert files["AGENTS.md"].startswith(MY_CLAUDE_MD + "\n## How to work\n")
+    assert "## Stack" not in files["AGENTS.md"]  # the user's own description replaces the generated one
+    assert files["CLAUDE.md"].startswith("@AGENTS.md\n")
+
+
+def test_adopting_does_not_duplicate_existing_principles() -> None:
+    mine = MY_CLAUDE_MD + "\n## How to work\n\n1. My own rules.\n"
+    agents = next(f for f in adopt_claude_md(generate(make_answers()), mine) if f.path == "AGENTS.md")
+    assert agents.content == mine
+    assert agents.content.count("## How to work") == 1
+
+
+@pytest.mark.parametrize(
+    ("existing", "agents_md_exists", "expected"),
+    [
+        (MY_CLAUDE_MD, False, True),
+        (MY_CLAUDE_MD, True, False),  # an existing AGENTS.md would be clobbered
+        ("@AGENTS.md\n\nnotes\n", False, False),  # already imports one
+    ],
+)
+def test_can_adopt_claude_md(existing: str, *, agents_md_exists: bool, expected: bool) -> None:
+    assert can_adopt_claude_md(existing, agents_md_exists) is expected

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import json
 import os
@@ -11,13 +12,11 @@ from typing import Annotated, Any
 import questionary
 import typer
 
-from .generate import generate
+from .generate import AGENTS_IMPORT, GeneratedFile, adopt_claude_md, can_adopt_claude_md, generate
 from .models import AGENTS, MCP_SERVERS, STACKS, Answers, Stack
 from .writer import plan, write
 
 app = typer.Typer(help="Set up Claude Code project files by answering a few questions.", no_args_is_help=True)
-
-AGENTS_IMPORT = "@AGENTS.md"
 
 ACTION_STYLE = {
     "create": ("+", typer.colors.GREEN),
@@ -85,6 +84,42 @@ def _show(a: Answers) -> None:
 
 def _load_answers(path: Path) -> Answers:
     return Answers.from_dict(json.loads(path.read_text()))
+
+
+def _show_diff(existing: str, generated: str, path: str) -> None:
+    diff = difflib.unified_diff(
+        existing.splitlines(), generated.splitlines(), f"{path} (yours)", f"{path} (generated)", lineterm=""
+    )
+    for line in diff:
+        color = typer.colors.GREEN if line.startswith("+") else typer.colors.RED if line.startswith("-") else None
+        typer.secho(f"    {line}", fg=color)
+
+
+def resolve_conflicts(files: list[GeneratedFile], root: Path) -> tuple[list[GeneratedFile], frozenset[str]]:
+    """Ask what to do with each generated file that already exists with different content.
+
+    Returns the files (AGENTS.md changes if the user moves their CLAUDE.md into it) and the paths to overwrite.
+    """
+    overwrite: set[str] = set()
+    for f in [f for f, action in plan(files, root) if action == "skip"]:
+        existing = (root / f.path).read_text()
+        choices = [questionary.Choice("Keep mine", value="keep")]
+        if f.path == "CLAUDE.md" and can_adopt_claude_md(existing, (root / "AGENTS.md").exists()):
+            choices.append(questionary.Choice("Move mine into AGENTS.md and import it (recommended)", value="adopt"))
+        choices += [
+            questionary.Choice("Replace it with the generated version", value="replace"),
+            questionary.Choice("Show the difference", value="diff"),
+        ]
+        typer.echo(f"\n{f.path} already exists.")
+        while (choice := _ask(questionary.select("What do you want to do with it?", choices=choices))) == "diff":
+            _show_diff(existing, f.content, f.path)
+        if choice == "adopt":
+            files = adopt_claude_md(files, existing)
+            overwrite.add(f.path)
+            typer.echo("  Your CLAUDE.md becomes AGENTS.md; the new CLAUDE.md imports it.")
+        elif choice == "replace":
+            overwrite.add(f.path)
+    return files, frozenset(overwrite)
 
 
 def _choices(catalog: dict[str, Any], label: Any, checked: tuple[str, ...] = ()) -> list[questionary.Choice]:
@@ -249,7 +284,11 @@ def init(
     if save_answers:
         save_answers.write_text(json.dumps(answers.to_dict(), indent=2) + "\n")
 
-    actions = plan(generate(answers), root, force=force)
+    files = generate(answers)
+    overwrite: frozenset[str] = frozenset()
+    if not force and not yes:
+        files, overwrite = resolve_conflicts(files, root)
+    actions = plan(files, root, force=force, overwrite=overwrite)
     typer.echo(f"\nFiles for {root}:\n")
     if not root.exists():
         typer.secho(f"  + {root}/  (new directory)", fg=typer.colors.GREEN)
@@ -259,7 +298,7 @@ def init(
     typer.echo()
 
     if all(action in ("skip", "unchanged") for _, action in actions):
-        typer.echo("Nothing to write: every file already exists. Rerun with --force to overwrite them.")
+        typer.echo("Nothing to write: every file already exists and you chose to keep them.")
         return
     if not yes and not _ask(questionary.confirm("Write these files?", default=True)):
         typer.echo("Nothing written.")

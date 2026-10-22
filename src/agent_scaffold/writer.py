@@ -16,8 +16,13 @@ def _merge_lines(existing: str, new: str) -> str:
     return existing + sep + "\n".join(missing) + "\n"
 
 
-def plan(files: list[GeneratedFile], root: Path, force: bool = False) -> list[tuple[GeneratedFile, str]]:
-    """Decide what happens to each file: create, overwrite, merge, skip or unchanged."""
+def plan(
+    files: list[GeneratedFile], root: Path, force: bool = False, overwrite: frozenset[str] = frozenset()
+) -> list[tuple[GeneratedFile, str]]:
+    """Decide what happens to each file: create, overwrite, merge, skip or unchanged.
+
+    Existing files are skipped unless `force` is set or their path is in `overwrite`.
+    """
     actions = []
     for f in files:
         target = root / f.path
@@ -29,7 +34,7 @@ def plan(files: list[GeneratedFile], root: Path, force: bool = False) -> list[tu
         elif target.read_text() == f.content:
             action = "unchanged"
         else:
-            action = "overwrite" if force else "skip"
+            action = "overwrite" if force or f.path in overwrite else "skip"
         actions.append((f, action))
     return actions
 

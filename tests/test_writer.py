@@ -42,3 +42,13 @@ def test_second_run_changes_nothing(tmp_path: Path) -> None:
     files = generate(make_answers())
     write(plan(files, tmp_path), tmp_path)
     assert set(actions_by_path(files, tmp_path).values()) == {"unchanged"}
+
+
+def test_overwrites_only_the_chosen_paths(tmp_path: Path) -> None:
+    (tmp_path / "CLAUDE.md").write_text("mine\n")
+    (tmp_path / "AGENTS.md").write_text("mine too\n")
+    actions = actions_by_path(generate(make_answers()), tmp_path)
+    assert actions["CLAUDE.md"] == actions["AGENTS.md"] == "skip"
+    chosen = {f.path: a for f, a in plan(generate(make_answers()), tmp_path, overwrite=frozenset({"CLAUDE.md"}))}
+    assert chosen["CLAUDE.md"] == "overwrite"
+    assert chosen["AGENTS.md"] == "skip"

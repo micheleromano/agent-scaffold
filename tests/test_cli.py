@@ -286,6 +286,90 @@ def test_interview_with_an_undecided_stack_skips_stack_questions(
         ask(None)
 
 
+# --- existing files -----------------------------------------------------------------------
+
+
+@pytest.fixture
+def existing_claude_md(project: Path) -> Path:
+    path = project / "CLAUDE.md"
+    path.write_text("# treesdolisten\n\nA frozen static blog.\n")
+    return path
+
+
+def run_with(monkeypatch: pytest.MonkeyPatch, project: Path, answers_file: Path, *choices: Any) -> str:
+    monkeypatch.setattr(cli, "_ask", replies(*choices))
+    result = runner.invoke(app, ["init", str(project), "--answers", str(answers_file)])
+    assert result.exit_code == 0, result.output
+    return result.output
+
+
+def test_keep_my_claude_md(
+    monkeypatch: pytest.MonkeyPatch, project: Path, answers_file: Path, existing_claude_md: Path
+) -> None:
+    output = run_with(monkeypatch, project, answers_file, "keep", True)
+    assert "CLAUDE.md already exists." in output
+    assert existing_claude_md.read_text() == "# treesdolisten\n\nA frozen static blog.\n"
+    assert "doesn't import AGENTS.md" in output
+
+
+def test_move_my_claude_md_into_agents_md(
+    monkeypatch: pytest.MonkeyPatch, project: Path, answers_file: Path, existing_claude_md: Path
+) -> None:
+    output = run_with(monkeypatch, project, answers_file, "adopt", True)
+    agents = (project / "AGENTS.md").read_text()
+    assert agents.startswith("# treesdolisten\n\nA frozen static blog.\n")
+    assert "## How to work" in agents
+    assert existing_claude_md.read_text().startswith("@AGENTS.md\n")
+    assert "CLAUDE.md  (overwrite)" in output
+    assert "doesn't import AGENTS.md" not in output
+
+
+def test_replace_my_claude_md(
+    monkeypatch: pytest.MonkeyPatch, project: Path, answers_file: Path, existing_claude_md: Path
+) -> None:
+    run_with(monkeypatch, project, answers_file, "replace", True)
+    assert existing_claude_md.read_text().startswith("@AGENTS.md\n")
+    assert (project / "AGENTS.md").read_text().startswith("# acme-app")
+
+
+def test_show_the_difference_then_choose(
+    monkeypatch: pytest.MonkeyPatch, project: Path, answers_file: Path, existing_claude_md: Path
+) -> None:
+    output = run_with(monkeypatch, project, answers_file, "diff", "keep", True)
+    assert "CLAUDE.md (yours)" in output
+    assert "-# treesdolisten" in output
+    assert "+@AGENTS.md" in output
+    assert existing_claude_md.read_text().startswith("# treesdolisten")
+
+
+def test_each_existing_file_gets_its_own_choice(
+    monkeypatch: pytest.MonkeyPatch, project: Path, answers_file: Path, existing_claude_md: Path
+) -> None:
+    settings = project / ".claude" / "settings.json"
+    settings.parent.mkdir()
+    settings.write_text("{}\n")
+    output = run_with(monkeypatch, project, answers_file, "keep", "replace", True)  # CLAUDE.md, then settings.json
+    assert ".claude/settings.json already exists." in output
+    assert existing_claude_md.read_text().startswith("# treesdolisten")
+    assert json.loads(settings.read_text())["$schema"]
+
+
+def test_yes_keeps_existing_files_without_asking(project: Path, answers_file: Path, existing_claude_md: Path) -> None:
+    result = runner.invoke(app, ["init", str(project), "--answers", str(answers_file), "--yes"])
+    assert result.exit_code == 0, result.output
+    assert "already exists" not in result.output
+    assert existing_claude_md.read_text().startswith("# treesdolisten")
+
+
+def test_force_replaces_existing_files_without_asking(
+    project: Path, answers_file: Path, existing_claude_md: Path
+) -> None:
+    result = runner.invoke(app, ["init", str(project), "--answers", str(answers_file), "--force", "--yes"])
+    assert result.exit_code == 0, result.output
+    assert "already exists" not in result.output
+    assert existing_claude_md.read_text().startswith("@AGENTS.md")
+
+
 # --- files and errors ---------------------------------------------------------------------
 
 

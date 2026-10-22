@@ -12,6 +12,8 @@ from .models import AGENTS, MCP_SERVERS, Answers
 
 SETTINGS_SCHEMA = "https://json.schemastore.org/claude-code-settings.json"
 GITIGNORE_LINES = ("CLAUDE.local.md", ".claude/settings.local.json")
+AGENTS_IMPORT = "@AGENTS.md"
+_PRINCIPLES_HEADING = "## How to work"
 
 
 @dataclass(frozen=True)
@@ -109,3 +111,20 @@ def generate(a: Answers) -> list[GeneratedFile]:
             )
         )
     return files
+
+
+def can_adopt_claude_md(existing_claude_md: str, agents_md_exists: bool) -> bool:
+    """An existing CLAUDE.md can move into AGENTS.md if it doesn't already import one and there's none to clash with."""
+    return not agents_md_exists and AGENTS_IMPORT not in existing_claude_md.splitlines()
+
+
+def adopt_claude_md(files: list[GeneratedFile], existing_claude_md: str) -> list[GeneratedFile]:
+    """Make the user's CLAUDE.md the body of AGENTS.md, followed by the working principles.
+
+    The generated CLAUDE.md then imports it, so the user's instructions reach every agent.
+    """
+    agents = next(f for f in files if f.path == "AGENTS.md")
+    body = existing_claude_md.rstrip() + "\n"
+    if _PRINCIPLES_HEADING not in existing_claude_md:
+        body += "\n" + agents.content[agents.content.index(_PRINCIPLES_HEADING) :]
+    return [GeneratedFile("AGENTS.md", body) if f.path == "AGENTS.md" else f for f in files]
