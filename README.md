@@ -31,13 +31,14 @@ The project context lives in `AGENTS.md`, so Codex, Cursor and other agents that
 
 ## How agents work
 
-`AGENTS.md` includes five working principles. The first four are adapted from [Andrej Karpathy's notes on LLM coding mistakes](https://x.com/karpathy/status/2015883857489522876), as collected in [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills); the fifth comes from the humane design principles below:
+`AGENTS.md` includes six working principles. The first four are adapted from [Andrej Karpathy's notes on LLM coding mistakes](https://x.com/karpathy/status/2015883857489522876), as collected in [andrej-karpathy-skills](https://github.com/multica-ai/andrej-karpathy-skills); the fifth comes from the humane design principles below, and the sixth keeps dependencies current:
 
 1. **Think before coding:** state assumptions, surface ambiguity, ask when unclear.
 2. **Keep it simple:** the least code that solves the problem.
 3. **Make surgical changes:** every changed line traces back to the request.
 4. **Work toward a verifiable goal:** turn tasks into checks and loop until they pass.
 5. **Keep people in control:** ask before irreversible or outward-facing actions; report what was and wasn't verified.
+6. **Use current, compatible dependencies:** look up the latest stable versions when adding or upgrading packages, check they work together, and keep versions only in the package file and lockfile.
 
 ## Humane design guardrails
 

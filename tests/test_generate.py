@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from agent_scaffold.generate import adopt_claude_md, can_adopt_claude_md, generate
+from agent_scaffold.generate import adopt_claude_md, blocks, can_adopt_claude_md, generate
 from agent_scaffold.models import AGENTS, MCP_SERVERS, ROLES, STACKS, Answers
 
 from .helpers import MINIMAL, files_by_path, frontmatter, frontmatter_list, make_answers
@@ -183,6 +183,7 @@ def test_agents_md_has_the_working_principles() -> None:
         "Make surgical changes",
         "Work toward a verifiable goal",
         "Keep people in control",
+        "Use current, compatible dependencies",
     ):
         assert f"**{principle}.**" in agents
     assert "https://x.com/karpathy/status/2015883857489522876" in agents
@@ -313,3 +314,17 @@ def test_npx_mcp_servers_are_pinned_to_a_version() -> None:
             if arg.startswith("@") and arg.count("@") == 2:
                 version = arg.rsplit("@", 1)[1]
                 assert version[0].isdigit(), f"{key} must pin an exact version, not {version!r}"
+
+
+def test_dependency_principle_says_to_look_up_versions_not_record_them() -> None:
+    principles = blocks(files_by_path(make_answers())["AGENTS.md"])["principles"]
+    assert "look up the latest stable version" in principles
+    assert "don't write version numbers into `AGENTS.md`" in principles
+
+
+def test_choose_stack_checks_versions_and_records_names_only() -> None:
+    skill = files_by_path(make_answers(stack_undecided=True, stacks=[], format_on_edit=False))[
+        ".claude/skills/choose-stack/SKILL.md"
+    ]
+    assert "look up the latest stable version of each main library" in skill
+    assert "framework names (no version numbers)" in skill

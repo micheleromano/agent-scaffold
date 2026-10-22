@@ -183,7 +183,7 @@ def _project_questions(default_name: str, p: Answers | None, noun: str = "projec
             )
         primary = STACKS[stacks[0]] if stacks else None
         frameworks = _ask(
-            questionary.text("Main frameworks and libraries (optional):", default=p.frameworks if p else "")
+            questionary.text("Main frameworks and libraries, names only (optional):", default=p.frameworks if p else "")
         )
     architecture = _ask(
         questionary.text("Architecture in a sentence or two (optional):", default=p.architecture if p else "")

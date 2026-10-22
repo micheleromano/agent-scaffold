@@ -12,10 +12,10 @@ The stack for {{ a.name }} isn't chosen yet. Help the user choose it, then updat
    - Where it will run, and the budget for hosting.
    - Expected scale: a handful of users, thousands, or more.
    - Which languages the user (and their team) already know, and any deadline.
-2. Propose 2 or 3 options. For each: languages, main frameworks, database, hosting, why it fits, and its main trade-off. Recommend one, and prefer what the user already knows when it fits.
+2. Propose 2 or 3 options. For each: languages, main frameworks, database, hosting, why it fits, and its main trade-off. Recommend one, and prefer what the user already knows when it fits. Before recommending, look up the latest stable version of each main library and check that their requirements work together (see "Use current, compatible dependencies" in `AGENTS.md`).
 3. Wait for the user to choose. Don't create application code in this skill.
 4. Update the setup for the chosen stack:
-   - `AGENTS.md`: replace the "Not decided yet" text in Stack with the languages and frameworks, and add a `## Commands` section after it with install, run, test, lint and format commands.
+   - `AGENTS.md`: replace the "Not decided yet" text in Stack with the languages and framework names (no version numbers), and add a `## Commands` section after it with install, run, test, lint and format commands.
    - `.claude/rules/code-style.md` and `.claude/rules/testing.md`: add `paths:` frontmatter so each loads only for the stack's source or test files, e.g.
      ```
      ---
@@ -27,7 +27,7 @@ The stack for {{ a.name }} isn't chosen yet. Help the user choose it, then updat
    - `.claude/settings.json`: add `"Bash(<command>)"` and `"Bash(<command> *)"` to `permissions.allow` for the test and lint commands.
    - `CLAUDE.md`: remove the "Stack not chosen yet" line.
 {% if system %}
-   - The workspace blueprint, `{{ system.root_dir }}/{{ manifest }}`, which the root services table is built from: in the `services` entry whose `path` is `"{{ system.service_path }}"`, update its `answers` to match. Set `stack_undecided` to `false`; set `stacks` to the chosen languages from {% for key in stacks %}`{{ key }}`{% if not loop.last %}, {% endif %}{% endfor %}, or put file extensions in `extensions` for a language not on that list; and fill `frameworks`, `install_cmd`, `dev_cmd`, `test_cmd`, `lint_cmd` and `format_cmd`. Leave every other field as it is.
+   - The workspace blueprint, `{{ system.root_dir }}/{{ manifest }}`, which the root services table is built from: in the `services` entry whose `path` is `"{{ system.service_path }}"`, update its `answers` to match. Set `stack_undecided` to `false`; set `stacks` to the chosen languages from {% for key in stacks %}`{{ key }}`{% if not loop.last %}, {% endif %}{% endfor %}, or put file extensions in `extensions` for a language not on that list; and fill `frameworks` (names only), `install_cmd`, `dev_cmd`, `test_cmd`, `lint_cmd` and `format_cmd`. Leave every other field as it is.
    - Refresh the root services table by running `agent-scaffold init {{ system.root_dir }} --answers {{ system.root_dir }}/{{ manifest }} --yes`. It keeps every existing file and only updates the sections agent-scaffold maintains. If the command isn't installed, tell the user the root table will say "not decided yet" until they run it.
 {% endif %}
 5. Summarize what changed, then ask whether to delete this skill (`.claude/skills/choose-stack/`) now that it's done.
