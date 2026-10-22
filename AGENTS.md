@@ -17,14 +17,14 @@ Interview-driven CLI (and soon a web app) that generates a project's Claude Code
 
 ## Architecture
 
-models.py holds the Answers dataclass and the catalogs (stacks, MCP servers, agents). generate.py is a pure function Answers -> list[GeneratedFile] that renders Jinja2 templates in templates/. writer.py plans and applies changes to disk (create / merge / skip / overwrite). cli.py runs the questionary interview and the Typer command. The planned FastAPI service and Next.js wizard reuse generate.py unchanged.
+models.py holds the Answers dataclass and the catalogs (stacks, MCP servers, agents). generate.py is a pure function Answers -> list[GeneratedFile] that renders Jinja2 templates in templates/. writer.py plans and applies changes to disk (create / merge / skip / overwrite). questions.py runs the questionary interviews (through ui.py, which tests patch), apply.py previews and writes the files, and cli.py holds the Typer commands. The planned FastAPI service and Next.js wizard reuse generate.py unchanged.
 
 A task is done when `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` and `uv run pytest` all pass. Coverage is 100%; keep it there.
 
 ## Conventions
 
 - **This tool is stack-agnostic.** It runs on any project, so generated output must never assume a language, package manager or command. Every command comes from `Answers`; empty answers leave their line or section out rather than rendering a placeholder.
-- **`models.py` and `generate.py` stay pure:** no file system, network or environment access, and only pure-Python dependencies. They will run inside a Cloudflare Python Worker (Pyodide). All disk I/O belongs in `writer.py` and `cli.py`.
+- **`models.py` and `generate.py` stay pure:** no file system, network or environment access, and only pure-Python dependencies. They will run inside a Cloudflare Python Worker (Pyodide). All disk I/O belongs in `writer.py`, `apply.py` and `cli.py`.
 - **Generated formats follow the Claude Code docs** at code.claude.com/docs. Check the relevant page before changing a format, and link it in the commit message. Custom commands are skills (`.claude/skills/<name>/SKILL.md`); hooks are configured in `settings.json`.
 - **Build JSON with `json.dumps`, never in a template.** In YAML frontmatter, render user text through `| tojson` so colons and quotes can't break it.
 - **Never destroy user work:** existing files are skipped unless `--force`; `.gitignore` is merged line by line.

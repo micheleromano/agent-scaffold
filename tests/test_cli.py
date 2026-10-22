@@ -9,7 +9,7 @@ import questionary
 import typer
 from typer.testing import CliRunner
 
-from agent_scaffold import cli
+from agent_scaffold import cli, questions, ui
 from agent_scaffold.cli import app
 from agent_scaffold.models import Answers
 
@@ -39,7 +39,7 @@ def project(tmp_path: Path) -> Path:
 
 
 def replies(*values: Any) -> Callable[[Any], Any]:
-    """A stand-in for cli._ask that answers each question in turn and fails if asked too many."""
+    """A stand-in for ui.ask that answers each question in turn and fails if asked too many."""
     queue: Iterator[Any] = iter(values)
 
     def ask(_question: Any) -> Any:
@@ -66,7 +66,7 @@ def test_says_nothing_is_written_until_confirmed(project: Path, answers_file: Pa
 
 def test_declining_writes_nothing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, answers_file: Path) -> None:
     project = tmp_path / "new"
-    monkeypatch.setattr(cli, "_ask", replies(False))  # "Write these files?"
+    monkeypatch.setattr(ui, "ask", replies(False))  # "Write these files?"
     result = runner.invoke(app, ["init", str(project), "--answers", str(answers_file)])
     assert result.exit_code == 0, result.output
     assert "+ AGENTS.md" in result.output
@@ -77,7 +77,7 @@ def test_declining_writes_nothing(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
 
 def test_confirming_writes_the_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, answers_file: Path) -> None:
     project = tmp_path / "new" / "project"
-    monkeypatch.setattr(cli, "_ask", replies(True))
+    monkeypatch.setattr(ui, "ask", replies(True))
     result = runner.invoke(app, ["init", str(project), "--answers", str(answers_file)])
     assert result.exit_code == 0, result.output
     assert (project / "AGENTS.md").exists()
@@ -95,8 +95,8 @@ def test_nothing_to_write_skips_the_confirmation(project: Path, answers_file: Pa
 
 
 def test_answers_are_saved_even_when_declined(monkeypatch: pytest.MonkeyPatch, project: Path) -> None:
-    monkeypatch.setattr(cli, "interview", lambda _name, _previous=None: make_answers())
-    monkeypatch.setattr(cli, "_ask", replies("project", False))
+    monkeypatch.setattr(questions, "interview", lambda _name, _previous=None: make_answers())
+    monkeypatch.setattr(ui, "ask", replies("project", False))
     result = runner.invoke(app, ["init", str(project)])
     assert result.exit_code == 0, result.output
     assert "Your answers are saved" in result.output
@@ -109,8 +109,8 @@ def test_use_saved_answers_as_they_are(monkeypatch: pytest.MonkeyPatch, project:
     def no_interview(_name: str, _previous: Answers | None = None) -> Answers:
         raise AssertionError("'Use them as they are' should skip the interview")
 
-    monkeypatch.setattr(cli, "interview", no_interview)
-    monkeypatch.setattr(cli, "_ask", replies("use", True))
+    monkeypatch.setattr(questions, "interview", no_interview)
+    monkeypatch.setattr(ui, "ask", replies("use", True))
     result = runner.invoke(app, ["init", str(project)])
 
     assert result.exit_code == 0, result.output
@@ -129,9 +129,9 @@ def test_edit_prefills_the_interview_and_start_over_does_not(
         seen.append(previous)
         return make_answers(name="new")
 
-    monkeypatch.setattr(cli, "interview", fake_interview)
+    monkeypatch.setattr(questions, "interview", fake_interview)
     # Starting over asks whether it's a project or a workspace; editing keeps the kind.
-    monkeypatch.setattr(cli, "_ask", replies(choice, False) if choice == "edit" else replies(choice, "project", False))
+    monkeypatch.setattr(ui, "ask", replies(choice, False) if choice == "edit" else replies(choice, "project", False))
     result = runner.invoke(app, ["init", str(project)])
 
     assert result.exit_code == 0, result.output
@@ -141,7 +141,7 @@ def test_edit_prefills_the_interview_and_start_over_does_not(
 
 def test_saved_answers_are_kept_after_writing(monkeypatch: pytest.MonkeyPatch, project: Path) -> None:
     saved = save(project, make_answers())
-    monkeypatch.setattr(cli, "_ask", replies("use", True))
+    monkeypatch.setattr(ui, "ask", replies("use", True))
     runner.invoke(app, ["init", str(project)])
     assert saved.exists()
 
@@ -156,8 +156,8 @@ def test_saved_answers_are_kept_per_directory(tmp_path: Path) -> None:
 
 
 def test_save_answers_option_writes_a_copy(monkeypatch: pytest.MonkeyPatch, project: Path, tmp_path: Path) -> None:
-    monkeypatch.setattr(cli, "interview", lambda _name, _previous=None: make_answers())
-    monkeypatch.setattr(cli, "_ask", replies("project"))
+    monkeypatch.setattr(questions, "interview", lambda _name, _previous=None: make_answers())
+    monkeypatch.setattr(ui, "ask", replies("project"))
     copy = tmp_path / "copy.json"
     runner.invoke(app, ["init", str(project), "--save-answers", str(copy), "--yes"])
     assert cli._load_answers(copy) == make_answers()
@@ -176,13 +176,13 @@ def test_save_answers_option_writes_a_copy(monkeypatch: pytest.MonkeyPatch, proj
     ],
 )
 def test_pressing_enter_through_a_prefilled_interview_keeps_every_answer(previous: Answers) -> None:
-    assert cli.interview("folder-name", previous) == previous
+    assert questions.interview("folder-name", previous) == previous
 
 
 @pytest.mark.usefixtures("press_enter_everywhere")
 def test_fresh_interview_defaults_follow_the_role(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(questionary, "select", lambda _m, choices, default=None, **_kw: FakeQuestion("llm"))
-    answers = cli.interview("bot")
+    answers = questions.interview("bot")
     assert answers.role == "llm"
     assert answers.stacks == ["python"]  # the llm role's usual stack is pre-ticked
     assert answers.agents == ["code-reviewer", "security-auditor"]
@@ -198,7 +198,7 @@ def test_fresh_interview_defaults_come_from_the_first_preset(monkeypatch: pytest
             ["python"] if message.startswith("Languages") else [c.value for c in choices if c.checked]
         ),
     )
-    answers = cli.interview("folder-name")
+    answers = questions.interview("folder-name")
     assert answers.name == "folder-name"
     assert answers.test_cmd == "pytest"
     assert answers.format_on_edit is True
@@ -220,7 +220,7 @@ def test_switching_from_undecided_to_a_language_suggests_its_preset(monkeypatch:
             ["go"] if message.startswith("Languages") else [c.value for c in choices if c.checked]
         ),
     )
-    answers = cli.interview("idea", previous)
+    answers = questions.interview("idea", previous)
     assert answers.stacks == ["go"]
     assert answers.test_cmd == "go test ./..."
 
@@ -250,7 +250,7 @@ def test_interview_builds_answers(monkeypatch: pytest.MonkeyPatch, project: Path
         ["code-reviewer"],  # agents
         True,  # block dangerous
     )
-    monkeypatch.setattr(cli, "_ask", ask)
+    monkeypatch.setattr(ui, "ask", ask)
     result = runner.invoke(app, ["init", str(project), "--yes"])
 
     assert result.exit_code == 0, result.output
@@ -266,7 +266,7 @@ def test_interview_with_an_undecided_stack_skips_stack_questions(
     monkeypatch: pytest.MonkeyPatch, project: Path
 ) -> None:
     ask = replies("project", "habit", "A habit tracker for students.", "backend", False, "", "", [], [], True)
-    monkeypatch.setattr(cli, "_ask", ask)
+    monkeypatch.setattr(ui, "ask", ask)
     result = runner.invoke(app, ["init", str(project), "--yes"])
 
     assert result.exit_code == 0, result.output
@@ -289,7 +289,7 @@ def existing_claude_md(project: Path) -> Path:
 
 
 def run_with(monkeypatch: pytest.MonkeyPatch, project: Path, answers_file: Path, *choices: Any) -> str:
-    monkeypatch.setattr(cli, "_ask", replies(*choices))
+    monkeypatch.setattr(ui, "ask", replies(*choices))
     result = runner.invoke(app, ["init", str(project), "--answers", str(answers_file)])
     assert result.exit_code == 0, result.output
     return result.output
@@ -401,7 +401,7 @@ def test_a_file_path_is_rejected(tmp_path: Path, answers_file: Path) -> None:
 
 
 def test_summary_lists_answers_and_leaves_out_blanks() -> None:
-    rows = dict(cli.summarize(make_answers()))
+    rows = dict(ui.summarize(make_answers()))
     assert rows["Languages"] == "TypeScript / JavaScript, Python"
     assert rows["Commands"] == "test `npm test` · lint `npm run lint` · format `npx prettier --write`"
     assert rows["MCP servers"] == "GitHub, Sentry"
@@ -411,17 +411,17 @@ def test_summary_lists_answers_and_leaves_out_blanks() -> None:
 
 
 def test_summary_of_an_undecided_stack() -> None:
-    rows = dict(cli.summarize(Answers.from_dict({"name": "idea", "description": "", "stack_undecided": True})))
+    rows = dict(ui.summarize(Answers.from_dict({"name": "idea", "description": "", "stack_undecided": True})))
     assert rows["Languages"] == "not decided yet (/choose-stack)"
     assert "Commands" not in rows
     assert rows["Subagents"] == "none"
 
 
 def test_ask_returns_the_reply() -> None:
-    assert cli._ask(FakeQuestion("yes")) == "yes"  # type: ignore[arg-type]  # duck-typed stand-in for questionary.Question
+    assert ui.ask(FakeQuestion("yes")) == "yes"  # type: ignore[arg-type]  # duck-typed stand-in for questionary.Question
 
 
 def test_ctrl_c_aborts() -> None:
     # questionary returns None when the user presses Ctrl-C.
     with pytest.raises(typer.Abort):
-        cli._ask(FakeQuestion(None))  # type: ignore[arg-type]  # duck-typed stand-in for questionary.Question
+        ui.ask(FakeQuestion(None))  # type: ignore[arg-type]  # duck-typed stand-in for questionary.Question

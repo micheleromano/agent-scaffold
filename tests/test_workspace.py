@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from agent_scaffold import cli
+from agent_scaffold import cli, questions, ui
 from agent_scaffold.cli import app
 from agent_scaffold.generate import (
     MANIFEST,
@@ -254,14 +254,14 @@ def replies(*values: Any) -> Any:
 @pytest.mark.usefixtures("press_enter_everywhere")
 def test_pressing_enter_through_a_prefilled_workspace_interview_keeps_it() -> None:
     previous = Workspace.from_dict(make_workspace(mcp_servers=["github"]).to_dict())
-    assert cli.workspace_interview("folder", previous).to_dict() == previous.to_dict()
+    assert questions.workspace_interview("folder", previous).to_dict() == previous.to_dict()
 
 
 def test_init_a_workspace_from_the_interview(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     root = tmp_path / "acme"
     monkeypatch.setattr(
-        cli,
-        "_ask",
+        ui,
+        "ask",
         replies(
             "workspace",  # what are you setting up
             "acme",  # name
@@ -312,7 +312,7 @@ def test_init_offers_an_existing_workspace_manifest(
     monkeypatch: pytest.MonkeyPatch, workspace_on_disk: tuple[Path, list[GeneratedFile]]
 ) -> None:
     root, _ = workspace_on_disk
-    monkeypatch.setattr(cli, "_ask", replies("use"))
+    monkeypatch.setattr(ui, "ask", replies("use"))
     result = runner.invoke(app, ["init", str(root)])
     assert result.exit_code == 0, result.output
     assert "Saved answers for" in result.output
@@ -327,8 +327,8 @@ def test_add_service_updates_the_manifest_and_the_services_table(
     agents = root / "AGENTS.md"
     agents.write_text(agents.read_text() + "\nMy own notes.\n")
     monkeypatch.setattr(
-        cli,
-        "_ask",
+        ui,
+        "ask",
         replies("data", "data", "", "data", True, ["python"], "", "", "", "", "", "pytest", "", "", True),
     )
     result = runner.invoke(app, ["add-service", "data", "--workspace", str(root)])
@@ -358,14 +358,14 @@ def test_add_service_rejects_a_bad_folder(
     monkeypatch: pytest.MonkeyPatch, workspace_on_disk: tuple[Path, list[GeneratedFile]]
 ) -> None:
     root, _ = workspace_on_disk
-    monkeypatch.setattr(cli, "service_interview", lambda *_a: Service("backend/api", make_answers()))
+    monkeypatch.setattr(questions, "service_interview", lambda *_a: Service("backend/api", make_answers()))
     result = runner.invoke(app, ["add-service", "backend/api", "--workspace", str(root)])
     assert result.exit_code == 1
     assert "can't be inside other services" in result.output
 
 
 def test_summary_lists_each_service() -> None:
-    rows = dict(cli.summarize(make_workspace()))
+    rows = dict(ui.summarize(make_workspace()))
     assert rows["Workspace"] == "acme"
     assert rows["backend/"] == "Backend / API · TypeScript / JavaScript"
     assert rows["services/llm/"] == "LLM / AI service · not decided yet (/choose-stack)"
@@ -385,8 +385,8 @@ def test_editing_saved_workspace_answers_reopens_the_workspace_interview(
         seen.append(previous)
         return make_workspace(goal="A new goal.")
 
-    monkeypatch.setattr(cli, "workspace_interview", fake)
-    monkeypatch.setattr(cli, "_ask", replies("edit", False))
+    monkeypatch.setattr(questions, "workspace_interview", fake)
+    monkeypatch.setattr(ui, "ask", replies("edit", False))
     result = runner.invoke(app, ["init", str(root)])
 
     assert result.exit_code == 0, result.output
@@ -406,18 +406,18 @@ def test_a_workspace_can_start_with_no_services(tmp_path: Path) -> None:
     assert "No services yet. Add the first with `agent-scaffold add-service <folder>`." in agents
     assert "| Service |" not in agents
     assert "No services yet." in files[".claude/skills/review/SKILL.md"].content
-    assert dict(cli.summarize(ws))["Services"] == "none yet"
+    assert dict(ui.summarize(ws))["Services"] == "none yet"
     write_all(tmp_path, list(files.values()))
     assert_up_to_date(tmp_path, ws)
 
 
 def test_interview_can_skip_services(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        cli,
-        "_ask",
+        ui,
+        "ask",
         replies("acme", "", "monorepo", False, "", "", [], ["code-reviewer"], True),
     )
-    ws = cli.workspace_interview("acme")
+    ws = questions.workspace_interview("acme")
     assert ws.services == []
     assert ws.agents == ["code-reviewer"]
 
@@ -425,12 +425,12 @@ def test_interview_can_skip_services(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.usefixtures("press_enter_everywhere")
 def test_enter_through_an_empty_workspace_keeps_it_empty() -> None:
     previous = make_workspace(services=[])
-    assert cli.workspace_interview("acme", previous).to_dict() == previous.to_dict()
+    assert questions.workspace_interview("acme", previous).to_dict() == previous.to_dict()
 
 
 def test_first_service_added_later_fills_in_the_table(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     write_all(tmp_path, generate_workspace(make_workspace(services=[])))
-    monkeypatch.setattr(cli, "_ask", replies("llm", "llm", "", "llm", False, "", "", True))
+    monkeypatch.setattr(ui, "ask", replies("llm", "llm", "", "llm", False, "", "", True))
     result = runner.invoke(app, ["add-service", "llm", "--workspace", str(tmp_path)])
 
     assert result.exit_code == 0, result.output
@@ -504,5 +504,5 @@ def test_service_in_its_own_repo_has_a_plain_ci_workflow() -> None:
 
 @pytest.mark.usefixtures("press_enter_everywhere")
 def test_enter_through_a_new_workspace_asks_no_service_or_stack_questions() -> None:
-    ws = cli.workspace_interview("acme")
+    ws = questions.workspace_interview("acme")
     assert ws.services == []

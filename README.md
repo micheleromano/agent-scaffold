@@ -111,7 +111,10 @@ src/agent_scaffold/
   models.py     # Answers + catalogs (stacks, MCP servers, agents)
   generate.py   # Answers -> files (pure)
   writer.py     # plan + write: create / merge / skip / overwrite
-  cli.py        # interview (questionary) + Typer command
+  ui.py         # asking questions, showing answers and diffs
+  questions.py  # the project, service and workspace interviews
+  apply.py      # refresh, settle existing files, preview, confirm, write
+  cli.py        # Typer commands
   templates/    # Jinja2 templates
 ```
 
