@@ -1,5 +1,7 @@
 # agent-scaffold
 
+[![ci](https://github.com/micheleromano/agent-scaffold/actions/workflows/ci.yml/badge.svg)](https://github.com/micheleromano/agent-scaffold/actions/workflows/ci.yml)
+
 Answer a few questions about a project and get a working Claude Code setup: instructions, permissions, MCP connections, path-scoped rules, a review skill, subagents and safety hooks.
 
 ```
@@ -16,7 +18,7 @@ uv run agent-scaffold init path/to/project
 | `.mcp.json` | Shared MCP servers (GitHub, Sentry, Notion, Slack, Playwright) |
 | `.claude/settings.json` | Allows your test/lint/dev commands, denies reading `.env`, wires up hooks |
 | `.claude/rules/*.md` | Code-style and testing rules scoped with `paths:` to the files they cover, plus conventions for the project's role (see below) |
-| `.claude/skills/*/SKILL.md` | `/plan` before building, `/review` the current diff, `/ship` (checks, review, then commit and PR once you confirm), and `/choose-stack` when the stack isn't decided |
+| `.claude/skills/*/SKILL.md` | `/plan` before building, `/review` the current diff, `/ship` (checks, review, then commit and PR once you confirm), `/ci` (a GitHub Actions workflow and status badge, using the action versions current when it runs), and `/choose-stack` when the stack isn't decided |
 | `.claude/rules/humane-design.md` | Always: the Center for Humane Technology's principles as concrete guardrails (see below) |
 | `.claude/agents/humane-design-reviewer.md` | Always: reviews a diff against all seven principles |
 | `.claude/agents/*.md` | Optional code reviewer, security auditor and test writer subagents |

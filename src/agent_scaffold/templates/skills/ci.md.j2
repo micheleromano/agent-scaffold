@@ -1,0 +1,30 @@
+{% set monorepo = system and system.layout == "monorepo" %}
+{% set workflow = "ci-" ~ system.service_path | replace("/", "-") if monorepo else "ci" %}
+---
+name: ci
+description: {{ ("Set up CI for " ~ a.name ~ ": a GitHub Actions workflow that runs its checks on every push and pull request, plus a status badge") | tojson }}
+disable-model-invocation: true
+---
+
+Set up continuous integration so the checks run on every push and pull request, and add a status badge to the README.
+
+{% if a.stack_undecided %}
+The stack isn't chosen yet, so there are no checks to run. Ask the user to run `/choose-stack` first, then stop.
+
+{% endif %}
+1. Look in {% if monorepo %}the repository root's `{{ system.root_dir }}/.github/workflows/`{% else %}`.github/workflows/`{% endif %}. If a workflow already runs these checks, show it and ask whether to update it instead of adding another.
+{% set commands = [("install", a.install_cmd), ("lint", a.lint_cmd), ("test", a.test_cmd)] | selectattr(1) | list %}
+2. Take the commands from `AGENTS.md`{% if commands %}: {% for kind, cmd in commands %}{{ kind }} `{{ cmd }}`{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}. If the test or lint command is missing, ask the user how CI should verify the code.
+3. Write {% if monorepo %}`{{ system.root_dir }}/.github/workflows/{{ workflow }}.yml`{% else %}`.github/workflows/{{ workflow }}.yml`{% endif %}:
+   - `name: {{ workflow }}`; run on pushes to the default branch and on pull requests{% if monorepo %}, filtered with `paths:` to `{{ system.service_path }}/**` and the workflow file itself{% endif %}.
+   - `permissions: contents: read`.
+{% if monorepo %}
+   - `defaults: run: working-directory: {{ system.service_path }}`, since the workflow runs from the repository root.
+{% endif %}
+   - One job on `ubuntu-latest`: check out the code, set up the toolchain with its official setup action (with dependency caching where it offers it), then install, lint and test. Use the language version the project declares (e.g. `.python-version`, `engines` in `package.json`, `go.mod`).
+   - Look up the latest release of every action you use (`gh api repos/<owner>/<action>/releases/latest --jq .tag_name`) and reference its major version, e.g. `@v7`. Don't use versions you remember, and don't write them anywhere else.
+   - Never put secret values in the workflow. If a check needs one, reference `${{ '{{' }} secrets.NAME {{ '}}' }}` and tell the user to add it under Settings → Secrets and variables → Actions.
+4. Add a badge under the title of {% if monorepo %}`{{ system.service_path }}`'s `README.md`{% else %}`README.md`{% endif %} (create the README if there isn't one):
+   `[![{{ workflow }}](https://github.com/<owner>/<repo>/actions/workflows/{{ workflow }}.yml/badge.svg)](https://github.com/<owner>/<repo>/actions/workflows/{{ workflow }}.yml)`
+   Get `<owner>/<repo>` from `gh repo view --json nameWithOwner` or `git remote -v`. If there's no GitHub remote yet, skip the badge and say it can be added once the repository is on GitHub.
+5. If `actionlint` is installed, run it on the workflow. Show the user the workflow and the badge, and **wait for their go-ahead** before committing. After it's pushed, run `gh run watch` and report whether the checks pass.

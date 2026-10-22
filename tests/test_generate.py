@@ -22,6 +22,7 @@ def test_full_setup_writes_every_file() -> None:
         ".claude/skills/plan/SKILL.md",
         ".claude/skills/review/SKILL.md",
         ".claude/skills/ship/SKILL.md",
+        ".claude/skills/ci/SKILL.md",
         ".claude/rules/humane-design.md",
         ".claude/agents/humane-design-reviewer.md",
         ".claude/agents/code-reviewer.md",
@@ -43,6 +44,7 @@ def test_minimal_setup_writes_only_the_core_files() -> None:
         ".claude/skills/plan/SKILL.md",
         ".claude/skills/review/SKILL.md",
         ".claude/skills/ship/SKILL.md",
+        ".claude/skills/ci/SKILL.md",
         ".claude/rules/humane-design.md",
         ".claude/agents/humane-design-reviewer.md",
     }
@@ -328,3 +330,20 @@ def test_choose_stack_checks_versions_and_records_names_only() -> None:
     ]
     assert "look up the latest stable version of each main library" in skill
     assert "framework names (no version numbers)" in skill
+
+
+def test_ci_skill_runs_the_configured_checks_with_looked_up_action_versions() -> None:
+    ci = files_by_path(make_answers(install_cmd=""))[".claude/skills/ci/SKILL.md"]
+    assert "disable-model-invocation: true" in ci
+    assert "`AGENTS.md`: lint `npm run lint`, test `npm test`." in ci
+    assert "`.github/workflows/ci.yml`" in ci
+    assert "releases/latest" in ci
+    assert "${{ secrets.NAME }}" in ci
+    assert "**wait for their go-ahead**" in ci
+    assert "choose-stack" not in ci
+
+
+def test_ci_skill_waits_for_an_undecided_stack() -> None:
+    ci = files_by_path(Answers(name="idea", description="", stack_undecided=True))[".claude/skills/ci/SKILL.md"]
+    assert "run `/choose-stack` first, then stop" in ci
+    assert "Take the commands from `AGENTS.md`. If" in ci

@@ -486,3 +486,23 @@ def test_the_command_choose_stack_runs_refreshes_the_table_and_keeps_edits(
     assert result.exit_code == 0, result.output
     assert "| llm | `services/llm/` | LLM / AI service | Python | `pytest` |" in (root / "AGENTS.md").read_text()
     assert style.read_text().endswith("- Edited by /choose-stack.\n")
+
+
+def test_monorepo_service_ci_lives_at_the_repository_root() -> None:
+    files = by_path(generate_workspace(make_workspace(layout="monorepo")))
+    ci = files["services/llm/.claude/skills/ci/SKILL.md"].content
+    assert "`../../.github/workflows/ci-services-llm.yml`" in ci
+    assert "`services/llm/**`" in ci
+    assert "working-directory: services/llm" in ci
+
+
+def test_service_in_its_own_repo_has_a_plain_ci_workflow() -> None:
+    ci = by_path(generate_workspace(make_workspace(layout="repos")))["backend/.claude/skills/ci/SKILL.md"].content
+    assert "`.github/workflows/ci.yml`" in ci
+    assert "working-directory" not in ci
+
+
+@pytest.mark.usefixtures("press_enter_everywhere")
+def test_enter_through_a_new_workspace_asks_no_service_or_stack_questions() -> None:
+    ws = cli.workspace_interview("acme")
+    assert ws.services == []

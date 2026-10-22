@@ -40,6 +40,7 @@ class SystemContext:
     goal: str
     root_dir: str  # relative path from the service to the workspace root, e.g. "../.."
     service_path: str  # the service's folder, as recorded in the workspace manifest
+    layout: str  # how the workspace stores its services; a monorepo service's CI lives at the repository root
 
     @property
     def root(self) -> str:
@@ -152,6 +153,7 @@ def generate(a: Answers, system: SystemContext | None = None) -> list[GeneratedF
         GeneratedFile(".claude/skills/plan/SKILL.md", _render("skills/plan.md.j2", a)),
         GeneratedFile(".claude/skills/review/SKILL.md", _render("skills/review.md.j2", a)),
         GeneratedFile(".claude/skills/ship/SKILL.md", _render("skills/ship.md.j2", a)),
+        GeneratedFile(".claude/skills/ci/SKILL.md", _render("skills/ci.md.j2", a, system=system)),
         GeneratedFile(".gitignore", "\n".join(GITIGNORE_LINES) + "\n", merge_lines=True),
         *_shared_files(a),
     ]
@@ -197,7 +199,7 @@ def generate_workspace(ws: Workspace) -> list[GeneratedFile]:
         *_shared_files(root),
     ]
     for service, answers in services:
-        system = SystemContext(ws.name, ws.goal, "/".join([".."] * service.depth), service.path)
+        system = SystemContext(ws.name, ws.goal, "/".join([".."] * service.depth), service.path, ws.layout)
         files += [replace(f, path=posixpath.join(service.path, f.path)) for f in generate(answers, system)]
     return files
 

@@ -290,9 +290,12 @@ def workspace_interview(default_name: str, previous: Workspace | None = None) ->
         )
     )
     services: list[Service] = []
-    question = "Add a service now? (No: add them later with `agent-scaffold add-service`)"
-    # Fresh: suggest adding one. Editing: Enter walks through exactly the services there were.
-    while _ask(questionary.confirm(question, default=len(services) < len(p.services) if p else not services)):
+    question = (
+        "Add a service now? (No: set up just the workspace; add services later with `agent-scaffold add-service`)"
+    )
+    # Fresh: Enter sets up just the workspace, so service and stack questions only come when asked for.
+    # Editing: Enter walks through exactly the services there were.
+    while _ask(questionary.confirm(question, default=len(services) < len(p.services) if p else False)):
         before = p.services[len(services)] if p and len(services) < len(p.services) else None
         typer.echo(f"\nService {len(services) + 1}")
         services.append(service_interview(before))
