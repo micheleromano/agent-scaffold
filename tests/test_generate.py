@@ -338,6 +338,7 @@ def test_ci_skill_runs_the_configured_checks_with_looked_up_action_versions() ->
     assert "`AGENTS.md`: lint `npm run lint`, test `npm test`." in ci
     assert "`.github/workflows/ci.yml`" in ci
     assert "releases/latest" in ci
+    assert "otherwise use the full release tag" in ci
     assert "${{ secrets.NAME }}" in ci
     assert "**wait for their go-ahead**" in ci
     assert "choose-stack" not in ci
