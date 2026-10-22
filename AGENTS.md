@@ -29,7 +29,8 @@ A task is done when `uv run ruff format --check .`, `uv run ruff check .`, `uv r
 - **Build JSON with `json.dumps`, never in a template.** In YAML frontmatter, render user text through `| tojson` so colons and quotes can't break it.
 - **Never destroy user work:** existing files are skipped unless `--force`; `.gitignore` is merged line by line.
 - **Generated hook scripts use only the Python standard library.** They run in the user's project, which may have no Python environment.
-- **To add a stack, MCP server or agent:** add the catalog entry in `models.py`, a template if needed, and a test. The parametrized tests pick up new catalog entries automatically.
+- **To add a stack, role, MCP server or agent:** add the catalog entry in `models.py`, a template if needed (`templates/roles/<role>.md.j2` for a role), and a test. The parametrized tests pick up new catalog entries automatically.
+- **Managed blocks:** text between `<!-- agent-scaffold:name -->` markers is owned by the tool and refreshed by `init` and `add-service`; never put user content inside them, and never touch text outside them. Use a block only when generated text depends on the workspace's list of services.
 
 ## How to work
 

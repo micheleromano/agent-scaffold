@@ -3,7 +3,7 @@ import json
 import pytest
 
 from agent_scaffold.generate import adopt_claude_md, can_adopt_claude_md, generate
-from agent_scaffold.models import AGENTS, MCP_SERVERS, STACKS, Answers
+from agent_scaffold.models import AGENTS, MCP_SERVERS, ROLES, STACKS, Answers
 
 from .helpers import MINIMAL, files_by_path, frontmatter, frontmatter_list, make_answers
 
@@ -18,7 +18,7 @@ def test_full_setup_writes_every_file() -> None:
         ".claude/settings.json",
         ".claude/rules/code-style.md",
         ".claude/rules/testing.md",
-        ".claude/rules/api-conventions.md",
+        ".claude/rules/backend.md",
         ".claude/skills/plan/SKILL.md",
         ".claude/skills/review/SKILL.md",
         ".claude/skills/ship/SKILL.md",
@@ -243,7 +243,7 @@ MY_CLAUDE_MD = "# treesdolisten\n\nA frozen static blog on Cloudflare Pages.\n"
 
 def test_adopting_claude_md_moves_it_into_agents_md_with_the_principles() -> None:
     files = {f.path: f.content for f in adopt_claude_md(generate(make_answers()), MY_CLAUDE_MD)}
-    assert files["AGENTS.md"].startswith(MY_CLAUDE_MD + "\n## How to work\n")
+    assert files["AGENTS.md"].startswith(MY_CLAUDE_MD + "\n<!-- agent-scaffold:principles -->\n## How to work\n")
     assert "## Stack" not in files["AGENTS.md"]  # the user's own description replaces the generated one
     assert files["CLAUDE.md"].startswith("@AGENTS.md\n")
 
@@ -265,3 +265,29 @@ def test_adopting_does_not_duplicate_existing_principles() -> None:
 )
 def test_can_adopt_claude_md(existing: str, *, agents_md_exists: bool, expected: bool) -> None:
     assert can_adopt_claude_md(existing, agents_md_exists) is expected
+
+
+@pytest.mark.parametrize("role", [r for r in ROLES if r != "other"])
+def test_each_role_adds_its_conventions_rule(role: str) -> None:
+    files = files_by_path(make_answers(role=role))
+    rule = files[f".claude/rules/{role}.md"]
+    assert rule.startswith("# ")
+    assert rule.count("\n- ") >= 4
+    assert not rule.startswith("---")  # loads every session in this project
+
+
+def test_other_role_adds_no_rule() -> None:
+    files = files_by_path(make_answers(role="other"))
+    assert not any(path.startswith(".claude/rules/") and path[14:-3] in ROLES for path in files)
+
+
+def test_fullstack_rule_combines_backend_and_frontend() -> None:
+    rule = files_by_path(make_answers(role="fullstack"))[".claude/rules/fullstack.md"]
+    assert "## Backend and API" in rule
+    assert "## Frontend" in rule
+
+
+def test_llm_rule_covers_evals_and_untrusted_output() -> None:
+    rule = files_by_path(make_answers(role="llm"))[".claude/rules/llm.md"]
+    assert "run the eval set" in rule
+    assert "untrusted input" in rule

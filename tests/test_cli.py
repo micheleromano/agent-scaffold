@@ -13,17 +13,9 @@ from agent_scaffold import cli
 from agent_scaffold.cli import app
 from agent_scaffold.models import Answers
 
-from .helpers import MINIMAL, make_answers
+from .helpers import MINIMAL, FakeQuestion, make_answers
 
 runner = CliRunner()
-
-
-@pytest.fixture(autouse=True)
-def state_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    # Keep saved answers out of the real home directory.
-    path = tmp_path / "state"
-    monkeypatch.setenv("AGENT_SCAFFOLD_STATE_DIR", str(path))
-    return path
 
 
 @pytest.fixture
@@ -38,14 +30,6 @@ def project(tmp_path: Path) -> Path:
     path = tmp_path / "project"
     path.mkdir()
     return path
-
-
-class FakeQuestion:
-    def __init__(self, reply: Any) -> None:
-        self.reply = reply
-
-    def ask(self) -> Any:
-        return self.reply
 
 
 def replies(*values: Any) -> Callable[[Any], Any]:
@@ -106,7 +90,7 @@ def test_nothing_to_write_skips_the_confirmation(project: Path, answers_file: Pa
 
 def test_answers_are_saved_even_when_declined(monkeypatch: pytest.MonkeyPatch, project: Path) -> None:
     monkeypatch.setattr(cli, "interview", lambda _name, _previous=None: make_answers())
-    monkeypatch.setattr(cli, "_ask", replies(False))
+    monkeypatch.setattr(cli, "_ask", replies("project", False))
     result = runner.invoke(app, ["init", str(project)])
     assert result.exit_code == 0, result.output
     assert "Your answers are saved" in result.output
@@ -140,7 +124,8 @@ def test_edit_prefills_the_interview_and_start_over_does_not(
         return make_answers(name="new")
 
     monkeypatch.setattr(cli, "interview", fake_interview)
-    monkeypatch.setattr(cli, "_ask", replies(choice, False))
+    # Starting over asks whether it's a project or a workspace; editing keeps the kind.
+    monkeypatch.setattr(cli, "_ask", replies(choice, False) if choice == "edit" else replies(choice, "project", False))
     result = runner.invoke(app, ["init", str(project)])
 
     assert result.exit_code == 0, result.output
@@ -166,22 +151,13 @@ def test_saved_answers_are_kept_per_directory(tmp_path: Path) -> None:
 
 def test_save_answers_option_writes_a_copy(monkeypatch: pytest.MonkeyPatch, project: Path, tmp_path: Path) -> None:
     monkeypatch.setattr(cli, "interview", lambda _name, _previous=None: make_answers())
+    monkeypatch.setattr(cli, "_ask", replies("project"))
     copy = tmp_path / "copy.json"
     runner.invoke(app, ["init", str(project), "--save-answers", str(copy), "--yes"])
     assert cli._load_answers(copy) == make_answers()
 
 
 # --- pre-filled interview -----------------------------------------------------------------
-
-
-@pytest.fixture
-def press_enter_everywhere(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Replace questionary prompts with ones that accept their default, like pressing Enter."""
-    monkeypatch.setattr(questionary, "text", lambda _m, default="", **_kw: FakeQuestion(default))
-    monkeypatch.setattr(questionary, "confirm", lambda _m, default=True, **_kw: FakeQuestion(default))
-    monkeypatch.setattr(
-        questionary, "checkbox", lambda _m, choices, **_kw: FakeQuestion([c.value for c in choices if c.checked])
-    )
 
 
 @pytest.mark.usefixtures("press_enter_everywhere")
@@ -195,6 +171,15 @@ def press_enter_everywhere(monkeypatch: pytest.MonkeyPatch) -> None:
 )
 def test_pressing_enter_through_a_prefilled_interview_keeps_every_answer(previous: Answers) -> None:
     assert cli.interview("folder-name", previous) == previous
+
+
+@pytest.mark.usefixtures("press_enter_everywhere")
+def test_fresh_interview_defaults_follow_the_role(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(questionary, "select", lambda _m, choices, default=None, **_kw: FakeQuestion("llm"))
+    answers = cli.interview("bot")
+    assert answers.role == "llm"
+    assert answers.stacks == ["python"]  # the llm role's usual stack is pre-ticked
+    assert answers.agents == ["code-reviewer", "security-auditor"]
 
 
 @pytest.mark.usefixtures("press_enter_everywhere")
@@ -239,8 +224,10 @@ def test_switching_from_undecided_to_a_language_suggests_its_preset(monkeypatch:
 
 def test_interview_builds_answers(monkeypatch: pytest.MonkeyPatch, project: Path, tmp_path: Path) -> None:
     ask = replies(
+        "project",  # what are you setting up
         "shop",  # name
         "A shop.",  # description
+        "other",  # role
         True,  # languages known
         [],  # preset languages
         "ex, exs",  # other extensions
@@ -252,11 +239,10 @@ def test_interview_builds_answers(monkeypatch: pytest.MonkeyPatch, project: Path
         "mix test",  # test
         "mix credo",  # lint
         "mix format",  # format
-        False,  # has API
+        True,  # format on edit
         ["github"],  # MCP servers
         ["code-reviewer"],  # agents
         True,  # block dangerous
-        True,  # format on edit
     )
     monkeypatch.setattr(cli, "_ask", ask)
     result = runner.invoke(app, ["init", str(project), "--yes"])
@@ -273,7 +259,7 @@ def test_interview_builds_answers(monkeypatch: pytest.MonkeyPatch, project: Path
 def test_interview_with_an_undecided_stack_skips_stack_questions(
     monkeypatch: pytest.MonkeyPatch, project: Path
 ) -> None:
-    ask = replies("habit", "A habit tracker for students.", False, "", "", True, [], [], True)
+    ask = replies("project", "habit", "A habit tracker for students.", "backend", False, "", "", [], [], True)
     monkeypatch.setattr(cli, "_ask", ask)
     result = runner.invoke(app, ["init", str(project), "--yes"])
 
@@ -414,6 +400,7 @@ def test_summary_lists_answers_and_leaves_out_blanks() -> None:
     assert rows["Commands"] == "test `npm test` · lint `npm run lint` · format `npx prettier --write`"
     assert rows["MCP servers"] == "GitHub, Sentry"
     assert rows["Hooks"] == "block destructive commands, format on edit"
+    assert rows["Role"] == "Backend / API"
     assert "Architecture" not in rows
 
 

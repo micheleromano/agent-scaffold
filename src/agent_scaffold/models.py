@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
 
@@ -105,6 +105,47 @@ MCP_SERVERS: dict[str, McpServer] = {
     ),
 }
 
+
+@dataclass(frozen=True)
+class Role:
+    label: str
+    focus: str
+    default_stack: str | None
+    agents: tuple[str, ...]
+
+
+# What a project or service is for. Each role (except "other") adds a rule file of conventions for that purpose.
+ROLES: dict[str, Role] = {
+    "backend": Role(
+        "Backend / API",
+        "Serves data and business logic to clients or other services through an API.",
+        "typescript",
+        ("code-reviewer", "security-auditor"),
+    ),
+    "frontend": Role(
+        "Frontend (web or mobile UI)", "The interface people use directly.", "typescript", ("code-reviewer",)
+    ),
+    "fullstack": Role(
+        "Full-stack app", "UI and server in one codebase.", "typescript", ("code-reviewer", "security-auditor")
+    ),
+    "data": Role(
+        "Data pipeline",
+        "Ingests, transforms and stores data for the rest of the system.",
+        "python",
+        ("code-reviewer",),
+    ),
+    "llm": Role(
+        "LLM / AI service",
+        "Calls language models: prompts, retrieval, evaluation and model configuration.",
+        "python",
+        ("code-reviewer", "security-auditor"),
+    ),
+    "worker": Role(
+        "Background worker", "Runs scheduled or queued jobs outside the request path.", None, ("code-reviewer",)
+    ),
+    "other": Role("Other (library, CLI, tool, ...)", "", None, ("code-reviewer",)),
+}
+
 AGENTS: dict[str, str] = {
     "code-reviewer": "Code reviewer",
     "security-auditor": "Security auditor",
@@ -129,7 +170,7 @@ class Answers:
     test_cmd: str = ""
     lint_cmd: str = ""
     format_cmd: str = ""
-    has_api: bool = False
+    role: str = "other"
     mcp_servers: list[str] = field(default_factory=list)
     agents: list[str] = field(default_factory=list)
     block_dangerous: bool = True
@@ -146,6 +187,8 @@ class Answers:
                 raise ValueError("format_on_edit needs a decided stack")
         elif not self.stacks and not self.extensions:
             raise ValueError("pick at least one stack or file extension, or set stack_undecided")
+        if self.role not in ROLES:
+            raise ValueError(f"unknown role: {self.role}")
         for key, catalog, kind in (
             (self.stacks, STACKS, "stack"),
             (self.mcp_servers, MCP_SERVERS, "MCP server"),
@@ -175,8 +218,99 @@ class Answers:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Answers:
+        data = dict(data)
+        # Answers saved before roles existed had a has_api flag; an API project is a backend.
+        if "has_api" in data:
+            has_api = data.pop("has_api")
+            data.setdefault("role", "backend" if has_api else "other")
         known = set(cls.__dataclass_fields__)
         extra = set(data) - known
         if extra:
             raise ValueError(f"unknown fields: {', '.join(sorted(extra))}")
         return cls(**data)
+
+
+LAYOUTS: dict[str, str] = {
+    "monorepo": "One git repository with each service in a subfolder",
+    "repos": "Separate git repositories side by side, in a workspace repository that ignores them",
+}
+
+# Answers that a workspace sets once for every service.
+SHARED_FIELDS = ("mcp_servers", "agents", "block_dangerous")
+
+
+@dataclass
+class Service:
+    path: str
+    answers: Answers
+
+    def __post_init__(self) -> None:
+        parts = self.path.strip("/").split("/")
+        if not self.path.strip("/") or self.path.startswith(("/", "~")) or ".." in parts or "." in parts:
+            raise ValueError(f"service folder must be a relative path inside the workspace: {self.path!r}")
+        self.path = "/".join(parts)
+
+    @property
+    def depth(self) -> int:
+        return self.path.count("/") + 1
+
+
+@dataclass
+class Workspace:
+    """A system of several services sharing one goal. Saved as the workspace manifest."""
+
+    name: str
+    goal: str
+    layout: str
+    services: list[Service]
+    communication: str = ""
+    contracts: str = ""
+    mcp_servers: list[str] = field(default_factory=list)
+    agents: list[str] = field(default_factory=list)
+    block_dangerous: bool = True
+
+    def __post_init__(self) -> None:
+        if not self.name.strip():
+            raise ValueError("name is required")
+        if self.layout not in LAYOUTS:
+            raise ValueError(f"unknown layout: {self.layout}")
+        paths = [s.path for s in self.services]
+        duplicates = sorted({p for p in paths if paths.count(p) > 1})
+        if duplicates:
+            raise ValueError(f"duplicate service folders: {', '.join(duplicates)}")
+        nested = [a for a in paths for b in paths if a != b and a.startswith(b + "/")]
+        if nested:
+            raise ValueError(f"service folders can't be inside other services: {', '.join(sorted(set(nested)))}")
+        # Validates the shared choices against the catalogs.
+        Answers(name=self.name, description="", stack_undecided=True, **self.shared)
+
+    @property
+    def shared(self) -> dict[str, Any]:
+        return {f: getattr(self, f) for f in SHARED_FIELDS}
+
+    def service_answers(self, service: Service) -> Answers:
+        """A service's own answers with the workspace-wide choices applied."""
+        return replace(service.answers, **self.shared)
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        data["services"] = [
+            {"path": s.path, "answers": {k: v for k, v in s.answers.to_dict().items() if k not in SHARED_FIELDS}}
+            for s in self.services
+        ]
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> Workspace:
+        data = dict(data)
+        known = set(cls.__dataclass_fields__)
+        extra = set(data) - known
+        if extra:
+            raise ValueError(f"unknown fields: {', '.join(sorted(extra))}")
+        services = [Service(s["path"], Answers.from_dict(s["answers"])) for s in data.pop("services", [])]
+        return cls(services=services, **data)
+
+
+def load_answers(data: dict[str, Any]) -> Answers | Workspace:
+    """Read saved or hand-written answers: a "services" key means a workspace."""
+    return Workspace.from_dict(data) if "services" in data else Answers.from_dict(data)

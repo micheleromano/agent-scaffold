@@ -1,0 +1,13 @@
+@AGENTS.md
+
+## Claude Code
+
+`AGENTS.md` above is shared with every coding agent. This section adds what's specific to Claude Code.
+
+- **Where to start:** here, for work that spans services: every service is in reach, and each one's `CLAUDE.md` and skills load when you work on its files. In a service's folder, for focused work: its own setup loads, and this file still does.
+- **Skills here:** `/plan` a change across services, `/review` every service's changes, `/new-service` to add a service.
+- **Rules** in `.claude/rules/`: `humane-design.md` always loads. Each service adds its own code-style, testing and role rules.
+- **Subagents** in `.claude/agents/`: `humane-design-reviewer` for anything people see or use{% for key in a.agents %}, `{{ key }}`{% endfor %}.
+{% if a.block_dangerous %}
+- **Hooks** in `.claude/hooks/` block destructive shell commands. If a hook blocks something, tell the user rather than working around it.
+{% endif %}

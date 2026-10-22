@@ -1,0 +1,16 @@
+---
+name: new-service
+description: {{ ("Add a new service to " ~ ws.name ~ " with the standard structure for its role") | tojson }}
+argument-hint: "[folder]"
+disable-model-invocation: true
+---
+
+Add a service to {{ ws.name }}: $ARGUMENTS
+
+New services are created with `agent-scaffold add-service`, never by hand, so they get the standard structure for their role and are recorded in `agent-scaffold.workspace.json`.
+
+1. If the user hasn't said, ask what the service does and which folder it goes in. Suggest a role: {% for key, r in roles.items() %}{{ key }}{% if not loop.last %}, {% endif %}{% endfor %}.
+2. The command is interactive, so ask the user to run it themselves by typing:
+   `! agent-scaffold add-service <folder>`
+   It asks for the role, stack and commands, shows the files it will write, and waits for their confirmation.
+3. Afterwards, read the new service's `AGENTS.md`, and offer to fill in its architecture and to update "How the services talk" and "Contracts" in `AGENTS.md` here.

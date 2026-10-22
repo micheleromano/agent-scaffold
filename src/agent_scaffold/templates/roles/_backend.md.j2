@@ -1,0 +1,8 @@
+## Backend and API
+
+- Validate every request body and parameter at the boundary.
+- Return errors in one consistent shape: a machine-readable code and a human-readable message.
+- Check authorization on every endpoint, not only authentication.
+- Never change the shape of an existing response without a version bump or a migration plan.
+- Never edit a database migration after it has been merged; add a new one.
+- Document every new endpoint next to its handler.

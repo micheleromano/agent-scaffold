@@ -1,0 +1,6 @@
+# Background worker conventions
+
+- Make every job safe to retry: running it twice must not double its effect.
+- Retry failures with exponential backoff and a cap. Send what still fails to a dead-letter queue with enough context to replay it.
+- Give every job a timeout; long jobs report progress.
+- Log each job's start, end and outcome with an ID that links back to what triggered it.

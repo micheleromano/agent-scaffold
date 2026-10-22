@@ -4,16 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .generate import GeneratedFile
-
-
-def _merge_lines(existing: str, new: str) -> str:
-    present = set(existing.splitlines())
-    missing = [line for line in new.splitlines() if line not in present]
-    if not missing:
-        return existing
-    sep = "" if not existing or existing.endswith("\n") else "\n"
-    return existing + sep + "\n".join(missing) + "\n"
+from .generate import GeneratedFile, merge_lines
 
 
 def plan(
@@ -30,7 +21,7 @@ def plan(
             action = "create"
         elif f.merge_lines:
             existing = target.read_text()
-            action = "unchanged" if _merge_lines(existing, f.content) == existing else "merge"
+            action = "unchanged" if merge_lines(existing, f.content) == existing else "merge"
         elif target.read_text() == f.content:
             action = "unchanged"
         else:
@@ -46,4 +37,4 @@ def write(actions: list[tuple[GeneratedFile, str]], root: Path) -> None:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(f.content)
         elif action == "merge":
-            target.write_text(_merge_lines(target.read_text(), f.content))
+            target.write_text(merge_lines(target.read_text(), f.content))

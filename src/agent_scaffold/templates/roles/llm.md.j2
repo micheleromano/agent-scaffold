@@ -1,0 +1,11 @@
+# LLM service conventions
+
+- Keep prompts in version-controlled files, one per prompt, not as strings scattered through the code.
+- Pin model IDs and parameters in configuration. Change them deliberately, never by relying on a moving alias.
+- Before changing a prompt, model or retrieval setting, run the eval set and compare with the previous results. Add an eval case for every bug found.
+- Treat model output as untrusted input: parse and validate structured output, and never execute it or render it unescaped.
+- Keep instructions separate from retrieved or user-supplied text, so that text can't override them (prompt injection).
+- Handle provider errors: timeouts, rate limits with backoff, and a graceful fallback.
+- Track cost and latency per call, and point out changes that raise either.
+- Log prompts and responses for debugging without personal data, and respect the retention policy.
+- Label AI-generated content for the people who see it, and give them a path to a human where the outcome matters.

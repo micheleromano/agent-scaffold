@@ -15,7 +15,7 @@ uv run agent-scaffold init path/to/project
 | `CLAUDE.local.md` | Your machine-specific notes; gitignored |
 | `.mcp.json` | Shared MCP servers (GitHub, Sentry, Notion, Slack, Playwright) |
 | `.claude/settings.json` | Allows your test/lint/dev commands, denies reading `.env`, wires up hooks |
-| `.claude/rules/*.md` | Code-style, testing and API rules, each scoped with `paths:` to the files they cover |
+| `.claude/rules/*.md` | Code-style and testing rules scoped with `paths:` to the files they cover, plus conventions for the project's role (see below) |
 | `.claude/skills/*/SKILL.md` | `/plan` before building, `/review` the current diff, `/ship` (checks, review, then commit and PR once you confirm), and `/choose-stack` when the stack isn't decided |
 | `.claude/rules/humane-design.md` | Always: the Center for Humane Technology's principles as concrete guardrails (see below) |
 | `.claude/agents/humane-design-reviewer.md` | Always: reviews a diff against all seven principles |
@@ -50,6 +50,40 @@ Claude names a conflict and suggests an alternative instead of refusing; you dec
 
 They are always on, not an interview question: in projects with nothing user-facing, the rule costs only a few hundred tokens of context. To opt out, delete the files; that should be a deliberate choice.
 
+## Roles
+
+The interview asks what kind of project it is, and each role adds a rule of conventions for that purpose and pre-selects a sensible stack and subagents:
+
+| Role | Conventions |
+| --- | --- |
+| Backend / API | input validation, one error shape, authorization on every endpoint, versioned responses, append-only migrations |
+| Frontend | WCAG 2.2 AA, loading, empty and error states, no secrets in client code, reuse the design system |
+| Full-stack | both of the above |
+| Data pipeline | idempotent jobs, migrations, contract validation with quarantine, dry-run backfills, PII handling, lineage |
+| LLM / AI service | prompts as files, pinned models, evals before every prompt or model change, model output as untrusted input, prompt-injection separation, cost and latency tracking, AI labeling |
+| Background worker | safe retries, backoff and dead-letter queues, timeouts, traceable logs |
+| Other | none |
+
+## Systems with several services
+
+Answer "A system of several services" to the first question and agent-scaffold sets up a **workspace**: a backend, a data pipeline, an LLM service and so on, either as one monorepo or as separate repositories side by side.
+
+```
+acme/
+  agent-scaffold.workspace.json   the blueprint: goal, layout, services, shared choices (commit it)
+  AGENTS.md                       the goal, a services table, how they talk, contracts, rules for every service
+  CLAUDE.md, .claude/             cross-service /plan and /review, /new-service
+  backend/  data/  llm/           each a complete setup for its role, starting with "Part of acme. Goal: ..."
+```
+
+- **One goal, everywhere.** The root `AGENTS.md` states it, and every service's `AGENTS.md` repeats it in a system section, so a service cloned on its own still knows what it's for. Claude Code also loads the root `CLAUDE.md` in any service session, because it reads `CLAUDE.md` from every parent folder.
+- **Each service is set up for its purpose** through its role, and stands alone: settings and skills aren't inherited across repositories, so each service gets its own `.claude/`.
+- **Separate repositories:** the workspace is a small repository whose `.gitignore` excludes the service folders.
+- **Services can come later.** Start with just the goal and no services; the services table says so until the first one is added.
+- **New services follow the blueprint.** `agent-scaffold add-service <folder>` asks for the role, stack and commands, adds the service to the manifest, writes its setup, and refreshes the root services table and `/review` skill. The root `AGENTS.md` tells every agent to add services this way, never by hand.
+
+Sections that depend on the list of services (the services table, the `/review` service list, each service's "Part of" section) are wrapped in `<!-- agent-scaffold:name -->` markers. `init` and `add-service` refresh what's between them; everything else in the file is yours.
+
 ## Any stack
 
 Presets fill in default test, lint and format commands for TypeScript/JavaScript, Python, Go, Rust, Java/Kotlin, C#, Ruby, PHP and Swift. For any other language, enter its file extensions (e.g. `ex, exs`), and rules and hooks are scoped to those files. Every command can be edited or left blank, and blank answers are left out of the output.
@@ -67,7 +101,7 @@ The generated hooks are standard-library Python scripts, so the machine running 
 
 ## Design
 
-`generate.py` is a pure function from `Answers` to a list of files, with no file-system access. The CLI and the planned web API both call it, so the two can't drift apart.
+`generate.py` turns `Answers` (one project) or a `Workspace` (several services) into a list of files, and `refresh_blocks` updates the marked sections of existing files through a reader function. Neither touches the file system, so the CLI and the planned web API share them.
 
 ```
 src/agent_scaffold/

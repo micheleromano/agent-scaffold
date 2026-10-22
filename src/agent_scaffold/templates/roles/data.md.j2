@@ -1,0 +1,8 @@
+# Data pipeline conventions
+
+- Make every job idempotent: rerunning it for the same input or time window gives the same result, with no duplicates.
+- Change schemas only through migrations, and never edit a migration that has already run.
+- Validate incoming data against its contract at the boundary. Quarantine bad records instead of silently dropping them.
+- Backfills: dry-run on a sample, report the row counts, and ask before running against production data.
+- Collect the minimum personal data, mask it in logs and non-production copies, and document how long it is kept.
+- Record where each dataset comes from and who consumes it, so a change can be traced to everything it affects.

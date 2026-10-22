@@ -1,0 +1,42 @@
+# {{ ws.name }}
+
+## Goal
+
+{{ ws.goal or "TODO: the one outcome every service in this system works toward." }}
+
+Every service serves this goal. When a choice in one service affects another, prefer what serves the goal for the whole system.
+
+<!-- agent-scaffold:services -->
+## Services
+
+{% if not services %}
+No services yet. Add the first with `agent-scaffold add-service <folder>`.
+{% else %}
+| Service | Folder | Role | Stack | Test |
+| --- | --- | --- | --- | --- |
+{% for service, s in services %}
+| {{ s.name | cell }} | `{{ service.path }}/` | {{ roles[s.role].label | cell }} | {{ (s.languages | join(", ") if not s.stack_undecided else "not decided yet") | cell }} | {{ ("`" ~ s.test_cmd ~ "`" if s.test_cmd else "none yet") | cell }} |
+{% endfor %}
+
+Each service has its own `AGENTS.md` with its stack, commands and conventions, and a rule file for its role.
+{% endif %}
+<!-- /agent-scaffold:services -->
+
+## How the services talk
+
+{{ ws.communication or "TODO: which services call which, and how (HTTP, queues, shared storage)." }}
+
+## Contracts
+
+{{ ws.contracts or "TODO: where API schemas, event formats and shared types live." }}
+
+<!-- agent-scaffold:workspace-rules -->
+## Rules for every service
+
+- Create new services with `agent-scaffold add-service <folder>`, never by hand, so each one gets the standard structure for its role.
+- Services talk only through their documented interfaces: no importing another service's code, no reading its database.
+- Change a contract in a backward-compatible way, or update every consumer in the same piece of work.
+- For a change that spans services, plan across all of them first, change the contract first, then roll out in an order where nothing breaks in between.
+<!-- /agent-scaffold:workspace-rules -->
+
+{% include "_principles.md.j2" %}

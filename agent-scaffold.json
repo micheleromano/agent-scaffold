@@ -10,7 +10,7 @@
   "test_cmd": "uv run pytest",
   "lint_cmd": "uv run ruff check .",
   "format_cmd": "uv run ruff format",
-  "has_api": false,
+  "role": "other",
   "mcp_servers": [],
   "agents": ["code-reviewer", "test-writer"],
   "block_dangerous": true,

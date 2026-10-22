@@ -1,0 +1,26 @@
+---
+name: review
+description: {{ ("Review the uncommitted changes in every service of " ~ ws.name ~ ", including whether they still agree on their contracts") | tojson }}
+disable-model-invocation: true
+---
+
+Review the uncommitted changes across the services of {{ ws.name }}.
+
+1. Find the changes in each service:
+<!-- agent-scaffold:service-diffs -->
+{% if not services %}
+   - No services yet.
+{% endif %}
+{% for service, s in services %}
+{% if ws.layout == "repos" %}
+   - `{{ service.path }}`: `git -C {{ service.path }} diff HEAD`
+{% else %}
+   - `{{ service.path }}`: `git diff HEAD -- {{ service.path }}`
+{% endif %}
+{% endfor %}
+<!-- /agent-scaffold:service-diffs -->
+2. For each changed service, read its `AGENTS.md` and the rules in its `.claude/rules/` that match the changed files.
+3. Look for correctness bugs first, then contract mismatches between services (a changed API, event or schema whose consumers weren't updated), then missing tests and convention violations.
+4. Run the test command of each changed service, as listed in `AGENTS.md`.
+
+Report findings grouped by service, most severe first, each with file:line and a concrete fix.

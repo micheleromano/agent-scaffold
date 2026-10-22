@@ -1,0 +1,18 @@
+---
+name: plan
+description: {{ ("Plan a change across the services of " ~ ws.name ~ " before writing code: affected services, contract changes, rollout order, checks") | tojson }}
+argument-hint: "[what to build or fix]"
+disable-model-invocation: true
+---
+
+Plan this change across services before writing any code: $ARGUMENTS
+
+1. Read `AGENTS.md` here, then the `AGENTS.md` of each service the change might touch.
+2. Restate the goal in one sentence, how you'll know it's done, and how it serves the system's goal.
+3. List the affected services and why. List your assumptions and questions; if something blocks the plan, ask now and stop.
+4. Name any contract that changes (API, event, schema, shared type). Prefer a backward-compatible change.
+5. Write the steps in rollout order, so nothing breaks in between, each with a check:
+   `1. <service>: <step> -> verify: <that service's test command or another check>`
+6. Name the risks: data, security, performance, and how people using it are affected (`.claude/rules/humane-design.md`).
+
+Don't edit files. End by asking the user to approve or change the plan.

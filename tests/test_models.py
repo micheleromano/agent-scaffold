@@ -1,6 +1,6 @@
 import pytest
 
-from agent_scaffold.models import STACKS, Answers
+from agent_scaffold.models import AGENTS, ROLES, STACKS, Answers
 
 from .helpers import FULL, MINIMAL, make_answers
 
@@ -23,6 +23,7 @@ def test_round_trips_through_a_dict() -> None:
         ({"stacks": ["cobol"]}, "unknown stack"),
         ({"mcp_servers": ["fax"]}, "unknown MCP server"),
         ({"agents": ["intern"]}, "unknown agent"),
+        ({"role": "astronaut"}, "unknown role"),
         ({"format_cmd": "", "format_on_edit": True}, "format_cmd"),
     ],
 )
@@ -62,3 +63,17 @@ def test_undecided_stack_needs_no_languages() -> None:
     assert answers.globs == []
     assert answers.test_globs == []
     assert answers.languages == []
+
+
+@pytest.mark.parametrize(("has_api", "role"), [(True, "backend"), (False, "other")])
+def test_old_has_api_answers_become_a_role(*, has_api: bool, role: str) -> None:
+    answers = Answers.from_dict({**MINIMAL, "has_api": has_api})
+    assert answers.role == role
+
+
+@pytest.mark.parametrize("key", list(ROLES))
+def test_every_role_is_complete(key: str) -> None:
+    role = ROLES[key]
+    assert role.label
+    assert role.default_stack is None or role.default_stack in STACKS
+    assert set(role.agents) <= set(AGENTS)
