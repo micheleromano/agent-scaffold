@@ -1,3 +1,4 @@
+{% if a.test_globs %}
 ---
 paths:
 {% for g in a.test_globs %}
@@ -5,6 +6,7 @@ paths:
 {% endfor %}
 ---
 
+{% endif %}
 # Testing
 
 {% if a.test_cmd %}

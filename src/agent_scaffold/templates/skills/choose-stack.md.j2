@@ -1,0 +1,29 @@
+---
+name: choose-stack
+description: {{ ("Help choose the languages and frameworks for " ~ a.name ~ ", then finish its agent setup for that stack") | tojson }}
+disable-model-invocation: true
+---
+
+The stack for {{ a.name }} isn't chosen yet. Help the user choose it, then update the agent setup to match.
+
+1. Read `AGENTS.md` for the project idea. Ask what's still missing to decide, a few questions at a time:
+   - Who uses it, and on what: web, mobile, desktop, command line, or an API for other software?
+   - What data it stores, and what it connects to (payments, auth, AI models, other services).
+   - Where it will run, and the budget for hosting.
+   - Expected scale: a handful of users, thousands, or more.
+   - Which languages the user (and their team) already know, and any deadline.
+2. Propose 2 or 3 options. For each: languages, main frameworks, database, hosting, why it fits, and its main trade-off. Recommend one, and prefer what the user already knows when it fits.
+3. Wait for the user to choose. Don't create application code in this skill.
+4. Update the setup for the chosen stack:
+   - `AGENTS.md`: replace the "Not decided yet" text in Stack with the languages and frameworks, and add a `## Commands` section after it with install, run, test, lint and format commands.
+   - `.claude/rules/code-style.md` and `.claude/rules/testing.md`: add `paths:` frontmatter so each loads only for the stack's source or test files, e.g.
+     ```
+     ---
+     paths:
+       - "**/*.ts"
+     ---
+     ```
+     Then add the lint and test commands to the bullets.
+   - `.claude/settings.json`: add `"Bash(<command>)"` and `"Bash(<command> *)"` to `permissions.allow` for the test and lint commands.
+   - `CLAUDE.md`: remove the "Stack not chosen yet" line.
+5. Summarize what changed, then ask whether to delete this skill (`.claude/skills/choose-stack/`) now that it's done.

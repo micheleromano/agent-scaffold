@@ -10,6 +10,7 @@ from .helpers import MINIMAL, files_by_path, frontmatter, frontmatter_list, make
 
 def test_full_setup_writes_every_file() -> None:
     assert set(files_by_path(make_answers())) == {
+        "AGENTS.md",
         "CLAUDE.md",
         "CLAUDE.local.md",
         ".mcp.json",
@@ -18,7 +19,9 @@ def test_full_setup_writes_every_file() -> None:
         ".claude/rules/code-style.md",
         ".claude/rules/testing.md",
         ".claude/rules/api-conventions.md",
+        ".claude/skills/plan/SKILL.md",
         ".claude/skills/review/SKILL.md",
+        ".claude/skills/ship/SKILL.md",
         ".claude/rules/humane-design.md",
         ".claude/agents/humane-design-reviewer.md",
         ".claude/agents/code-reviewer.md",
@@ -30,13 +33,16 @@ def test_full_setup_writes_every_file() -> None:
 
 def test_minimal_setup_writes_only_the_core_files() -> None:
     assert set(files_by_path(Answers.from_dict(MINIMAL))) == {
+        "AGENTS.md",
         "CLAUDE.md",
         "CLAUDE.local.md",
         ".gitignore",
         ".claude/settings.json",
         ".claude/rules/code-style.md",
         ".claude/rules/testing.md",
+        ".claude/skills/plan/SKILL.md",
         ".claude/skills/review/SKILL.md",
+        ".claude/skills/ship/SKILL.md",
         ".claude/rules/humane-design.md",
         ".claude/agents/humane-design-reviewer.md",
     }
@@ -60,21 +66,21 @@ def test_every_preset_renders_valid_files(stack: str) -> None:
     assert frontmatter_list(files[".claude/rules/code-style.md"], "paths") == list(preset.globs)
     assert frontmatter_list(files[".claude/rules/testing.md"], "paths") == list(preset.test_globs)
     for path, content in files.items():
-        assert "TODO" not in content or path in ("CLAUDE.md", "CLAUDE.local.md"), path
+        assert "TODO" not in content or path in ("AGENTS.md", "CLAUDE.local.md"), path
         if path.endswith(".py"):
             compile(content, path, "exec")
 
 
 def test_custom_extensions_without_a_preset() -> None:
     files = files_by_path(Answers.from_dict(MINIMAL))
-    assert "- *.ex files" in files["CLAUDE.md"]
+    assert "- *.ex files" in files["AGENTS.md"]
     assert frontmatter_list(files[".claude/rules/code-style.md"], "paths") == ["**/*.ex"]
     assert frontmatter_list(files[".claude/rules/testing.md"], "paths") == ["**/*test*.ex", "**/*spec*.ex"]
 
 
 def test_empty_commands_are_left_out() -> None:
     files = files_by_path(Answers.from_dict(MINIMAL))
-    assert files["CLAUDE.md"].startswith("# tiny\n\n## Stack\n\n- *.ex files\n\n## Architecture\n")
+    assert files["AGENTS.md"].startswith("# tiny\n\n## Stack\n\n- *.ex files\n\n## Architecture\n")
     assert json.loads(files[".claude/settings.json"])["permissions"]["allow"] == []
     assert "Run `" not in files[".claude/skills/review/SKILL.md"]
 
@@ -144,7 +150,8 @@ def test_humane_design_rule_is_always_generated_and_loaded() -> None:
     # No `paths:` frontmatter, so Claude Code loads it every session rather than per file.
     assert not rule.startswith("---")
     assert "https://www.humanetech.com/humane-product-design" in rule
-    assert "## How the agent works with people" in rule
+    assert "## What we build" in rule
+    assert 'in `AGENTS.md` under "How to work"' in rule
 
 
 def test_humane_design_reviewer_covers_all_seven_principles() -> None:
@@ -152,3 +159,80 @@ def test_humane_design_reviewer_covers_all_seven_principles() -> None:
     assert frontmatter(agent)["tools"] == "Read, Glob, Grep"
     for n in range(1, 8):
         assert f"\n{n}. **" in agent
+
+
+def test_claude_md_imports_agents_md_first() -> None:
+    claude = files_by_path(make_answers())["CLAUDE.md"]
+    # Claude Code only reads AGENTS.md through this import when CLAUDE.md or CLAUDE.local.md exists.
+    assert claude.splitlines()[0] == "@AGENTS.md"
+    assert "`humane-design-reviewer` for anything people see or use, `code-reviewer`, `security-auditor`." in claude
+    assert "block destructive shell commands and format each file after you edit it" in claude
+
+
+def test_claude_md_leaves_out_hooks_when_none_chosen() -> None:
+    claude = files_by_path(make_answers(block_dangerous=False, format_on_edit=False))["CLAUDE.md"]
+    assert "Hooks" not in claude
+
+
+def test_agents_md_has_the_working_principles() -> None:
+    agents = files_by_path(make_answers())["AGENTS.md"]
+    assert "## How to work" in agents
+    for principle in (
+        "Think before coding",
+        "Keep it simple",
+        "Make surgical changes",
+        "Work toward a verifiable goal",
+        "Keep people in control",
+    ):
+        assert f"**{principle}.**" in agents
+    assert "https://x.com/karpathy/status/2015883857489522876" in agents
+
+
+@pytest.mark.parametrize("skill", ["plan", "review", "ship"])
+def test_skills_are_user_invoked_only(skill: str) -> None:
+    # Skills with side effects (ship) or that need a deliberate start (plan, review) must not auto-trigger.
+    meta = frontmatter(files_by_path(make_answers())[f".claude/skills/{skill}/SKILL.md"])
+    assert meta["name"] == skill
+    assert meta["disable-model-invocation"] == "true"
+
+
+def test_ship_runs_configured_checks_and_waits_for_confirmation() -> None:
+    ship = files_by_path(make_answers())[".claude/skills/ship/SKILL.md"]
+    assert "`npm run lint`" in ship
+    assert "`npm test`" in ship
+    assert "**Wait for their go-ahead**" in ship
+    assert "`code-reviewer` subagent" in ship
+
+
+def test_ship_without_commands_asks_how_to_verify() -> None:
+    ship = files_by_path(Answers.from_dict(MINIMAL))[".claude/skills/ship/SKILL.md"]
+    assert "no test command is configured" in ship
+    assert "code-reviewer" not in ship
+
+
+UNDECIDED = {"name": "habit", "description": "A habit tracker for students.", "stack_undecided": True}
+
+
+def test_undecided_stack_adds_the_choose_stack_skill() -> None:
+    files = files_by_path(Answers.from_dict(UNDECIDED))
+    skill = files[".claude/skills/choose-stack/SKILL.md"]
+    assert frontmatter(skill)["disable-model-invocation"] == "true"
+    assert "Propose 2 or 3 options" in skill
+    assert "Wait for the user to choose" in skill
+    assert ".claude/skills/choose-stack/SKILL.md" not in files_by_path(make_answers())
+
+
+def test_undecided_stack_is_recorded_in_agents_and_claude_md() -> None:
+    files = files_by_path(Answers.from_dict(UNDECIDED))
+    assert "## Stack\n\nNot decided yet." in files["AGENTS.md"]
+    assert "## Commands" not in files["AGENTS.md"]
+    assert "run `/choose-stack` before writing application code" in files["CLAUDE.md"]
+    assert "Not decided yet" not in files_by_path(make_answers())["AGENTS.md"]
+    assert "/choose-stack" not in files_by_path(make_answers())["CLAUDE.md"]
+
+
+def test_undecided_stack_rules_load_everywhere_until_scoped() -> None:
+    # Without paths: frontmatter, Claude Code loads a rule for every file; /choose-stack adds the paths later.
+    files = files_by_path(Answers.from_dict(UNDECIDED))
+    assert files[".claude/rules/code-style.md"].startswith("# Code style")
+    assert files[".claude/rules/testing.md"].startswith("# Testing")

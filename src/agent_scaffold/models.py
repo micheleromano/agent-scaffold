@@ -116,6 +116,8 @@ AGENTS: dict[str, str] = {
 class Answers:
     name: str
     description: str
+    # True when the languages aren't known yet; the /choose-stack skill finishes the setup later.
+    stack_undecided: bool = False
     stacks: list[str] = field(default_factory=list)
     # File extensions for languages without a preset, e.g. ["ex", "exs"] for Elixir.
     extensions: list[str] = field(default_factory=list)
@@ -137,8 +139,13 @@ class Answers:
         if not self.name.strip():
             raise ValueError("name is required")
         self.extensions = [e.strip().lstrip(".").lower() for e in self.extensions if e.strip().lstrip(".")]
-        if not self.stacks and not self.extensions:
-            raise ValueError("pick at least one stack or file extension")
+        if self.stack_undecided:
+            if self.stacks or self.extensions:
+                raise ValueError("stack_undecided can't be combined with stacks or extensions")
+            if self.format_on_edit:
+                raise ValueError("format_on_edit needs a decided stack")
+        elif not self.stacks and not self.extensions:
+            raise ValueError("pick at least one stack or file extension, or set stack_undecided")
         for key, catalog, kind in (
             (self.stacks, STACKS, "stack"),
             (self.mcp_servers, MCP_SERVERS, "MCP server"),

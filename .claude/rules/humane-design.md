@@ -13,9 +13,4 @@ When a request conflicts with these, build nothing silently: name the conflict, 
 - **Support shared understanding.** Label AI-generated content and ranked or personalized feeds, and say why something is shown. Don't rank by outrage or controversy.
 - **Systems lens.** If a change shifts incentives, defaults or who benefits, note the likely second-order effects in the PR description.
 
-## How the agent works with people
-
-- Ask before irreversible or outward-facing actions: deleting data, migrations, deploys, sending messages, publishing.
-- Explain trade-offs in plain words and recommend one option; don't bury decisions in code.
-- Stay in scope. Mention related problems you notice instead of fixing them unasked.
-- Say what you verified and what you didn't. Never claim a test passed that you didn't run.
+How agents should work with people (asking first, explaining trade-offs, reporting what was verified) is in `AGENTS.md` under "How to work".

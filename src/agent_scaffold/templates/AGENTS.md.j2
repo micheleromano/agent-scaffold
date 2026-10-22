@@ -1,0 +1,55 @@
+# {{ a.name }}
+
+{% if a.description %}
+{{ a.description }}
+
+{% endif %}
+## Stack
+
+{% if a.stack_undecided %}
+Not decided yet. Before writing application code, help the user choose the languages and frameworks from the description above, then fill in this section and a Commands section (in Claude Code, run `/choose-stack`).
+{% endif %}
+{% for language in a.languages %}
+- {{ language }}
+{% endfor %}
+{% if a.frameworks %}
+- Frameworks and libraries: {{ a.frameworks }}
+{% endif %}
+
+{% if a.install_cmd or a.dev_cmd or a.test_cmd or a.lint_cmd or a.format_cmd %}
+## Commands
+
+{% if a.install_cmd %}
+- Install: `{{ a.install_cmd }}`
+{% endif %}
+{% if a.dev_cmd %}
+- Run locally: `{{ a.dev_cmd }}`
+{% endif %}
+{% if a.test_cmd %}
+- Test: `{{ a.test_cmd }}`
+{% endif %}
+{% if a.lint_cmd %}
+- Lint: `{{ a.lint_cmd }}`
+{% endif %}
+{% if a.format_cmd %}
+- Format: `{{ a.format_cmd }}`
+{% endif %}
+
+{% endif %}
+## Architecture
+
+{{ a.architecture or "TODO: describe the main parts of the system and how they fit together." }}
+
+## Conventions
+
+{{ a.conventions or "TODO: list the conventions a new contributor gets wrong most often." }}
+
+## How to work
+
+Adapted from Andrej Karpathy's notes on common LLM coding mistakes (https://x.com/karpathy/status/2015883857489522876, via github.com/multica-ai/andrej-karpathy-skills) and the Center for Humane Technology's principles (https://www.humanetech.com/humane-product-design). These favor care over speed; for trivial tasks, use judgment.
+
+1. **Think before coding.** Say what you're assuming. If a request can be read more than one way, lay out the readings instead of picking one quietly. If something is unclear, stop and ask. If there's a simpler approach, propose it.
+2. **Keep it simple.** Write the least code that solves the problem: no features, options or abstractions nobody asked for, and no handling for cases that can't happen. If a senior engineer would call it overbuilt, cut it down.
+3. **Make surgical changes.** Every changed line should trace back to the request. Match the existing style, leave unrelated code alone, and mention problems you notice instead of fixing them unasked. Do clean up anything your own change made unused.
+4. **Work toward a verifiable goal.** Turn the task into a check you can run, such as a failing test that should pass. For multi-step work, write a short plan with a check for each step, and keep going until the checks pass.
+5. **Keep people in control.** Ask before anything irreversible or outward-facing: deleting data, migrations, deploys, publishing, sending messages. Explain trade-offs in plain words and recommend one option. Report what you verified and what you didn't; never claim a check passed that you didn't run.

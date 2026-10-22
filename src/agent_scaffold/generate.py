@@ -76,17 +76,22 @@ def mcp_config(a: Answers) -> dict[str, Any]:
 def generate(a: Answers) -> list[GeneratedFile]:
     env_vars = [v for key in a.mcp_servers for v in MCP_SERVERS[key].env]
     files = [
+        GeneratedFile("AGENTS.md", _render("AGENTS.md.j2", a)),
         GeneratedFile("CLAUDE.md", _render("CLAUDE.md.j2", a)),
         GeneratedFile("CLAUDE.local.md", _render("CLAUDE.local.md.j2", a, env_vars=env_vars)),
         GeneratedFile(".claude/settings.json", _json(settings(a))),
         GeneratedFile(".claude/rules/code-style.md", _render("rules/code-style.md.j2", a)),
         GeneratedFile(".claude/rules/testing.md", _render("rules/testing.md.j2", a)),
+        GeneratedFile(".claude/skills/plan/SKILL.md", _render("skills/plan.md.j2", a)),
         GeneratedFile(".claude/skills/review/SKILL.md", _render("skills/review.md.j2", a)),
+        GeneratedFile(".claude/skills/ship/SKILL.md", _render("skills/ship.md.j2", a)),
         # Humane design guardrails are always on; see README.
         GeneratedFile(".claude/rules/humane-design.md", _render("rules/humane-design.md.j2", a)),
         GeneratedFile(".claude/agents/humane-design-reviewer.md", _render("agents/humane-design-reviewer.md.j2", a)),
         GeneratedFile(".gitignore", "\n".join(GITIGNORE_LINES) + "\n", merge_lines=True),
     ]
+    if a.stack_undecided:
+        files.append(GeneratedFile(".claude/skills/choose-stack/SKILL.md", _render("skills/choose-stack.md.j2", a)))
     if a.mcp_servers:
         files.append(GeneratedFile(".mcp.json", _json(mcp_config(a))))
     if a.has_api:

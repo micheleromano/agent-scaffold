@@ -15,6 +15,11 @@ def test_round_trips_through_a_dict() -> None:
     [
         ({"name": "  "}, "name is required"),
         ({"stacks": [], "extensions": []}, "at least one stack or file extension"),
+        ({"stack_undecided": True}, "can't be combined with stacks"),
+        (
+            {"stack_undecided": True, "stacks": [], "format_on_edit": True},
+            "format_on_edit needs a decided stack",
+        ),
         ({"stacks": ["cobol"]}, "unknown stack"),
         ({"mcp_servers": ["fax"]}, "unknown MCP server"),
         ({"agents": ["intern"]}, "unknown agent"),
@@ -50,3 +55,10 @@ def test_every_preset_has_code_and_test_globs(key: str) -> None:
     assert stack.globs
     assert stack.test_globs
     assert stack.test
+
+
+def test_undecided_stack_needs_no_languages() -> None:
+    answers = Answers.from_dict({"name": "idea", "description": "", "stack_undecided": True})
+    assert answers.globs == []
+    assert answers.test_globs == []
+    assert answers.languages == []

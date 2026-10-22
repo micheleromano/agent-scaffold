@@ -27,7 +27,7 @@ def test_skips_existing_files_unless_forced(tmp_path: Path) -> None:
 
     assert actions_by_path(files, tmp_path, force=True)["CLAUDE.md"] == "overwrite"
     write(plan(files, tmp_path, force=True), tmp_path)
-    assert (tmp_path / "CLAUDE.md").read_text().startswith("# acme-app")
+    assert (tmp_path / "CLAUDE.md").read_text().startswith("@AGENTS.md")
 
 
 def test_merges_gitignore_lines(tmp_path: Path) -> None:

@@ -1,3 +1,4 @@
+{% if a.globs %}
 ---
 paths:
 {% for g in a.globs %}
@@ -5,6 +6,7 @@ paths:
 {% endfor %}
 ---
 
+{% endif %}
 # Code style
 
 - Match the style of the surrounding code: naming, comment density, file layout.
