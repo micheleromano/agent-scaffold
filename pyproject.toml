@@ -14,12 +14,18 @@ dependencies = [
 [project.scripts]
 agent-scaffold = "agent_scaffold.cli:app"
 
+[project.optional-dependencies]
+cohere = [
+    "cohere>=7.3.0",
+]
+
 [build-system]
 requires = ["uv_build>=0.13.4,<0.14.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "cohere>=7.3.0",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",

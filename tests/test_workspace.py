@@ -381,7 +381,7 @@ def test_editing_saved_workspace_answers_reopens_the_workspace_interview(
     saved.write_text(json.dumps(make_workspace().to_dict()))
     seen: list[Workspace | None] = []
 
-    def fake(_name: str, previous: Workspace | None = None) -> Workspace:
+    def fake(_name: str, previous: Workspace | None = None, _root: Path | None = None) -> Workspace:
         seen.append(previous)
         return make_workspace(goal="A new goal.")
 

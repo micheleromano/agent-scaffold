@@ -11,6 +11,8 @@ def state_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     # Keep saved answers out of the real home directory.
     path = tmp_path / "state"
     monkeypatch.setenv("AGENT_SCAFFOLD_STATE_DIR", str(path))
+    # Never call the real Cohere API from tests, even when the developer has a key set.
+    monkeypatch.delenv("CO_API_KEY", raising=False)
     return path
 
 

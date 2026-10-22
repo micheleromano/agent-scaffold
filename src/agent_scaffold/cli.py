@@ -96,7 +96,7 @@ def init(
             answers = (
                 previous
                 if previous and choice == "use"
-                else questions.new_answers(root.name, previous if choice == "edit" else None)
+                else questions.new_answers(root.name, previous if choice == "edit" else None, root)
             )
     except (ValueError, TypeError, KeyError) as e:
         typer.secho(f"Invalid answers: {e}", fg=typer.colors.RED, err=True)
@@ -132,7 +132,7 @@ def add_service(
     if existing:
         typer.echo(f"{existing.path}/ is already a service; its answers are pre-filled.\n")
     try:
-        service = questions.service_interview(existing, folder)
+        service = questions.service_interview(existing, folder, root)
         others = [s for s in ws.services if s.path not in (service.path, existing.path if existing else "")]
         updated = replace(ws, services=[*others, service])
     except ValueError as e:

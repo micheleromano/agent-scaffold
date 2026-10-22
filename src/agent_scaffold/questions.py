@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import os
 import posixpath
+from pathlib import Path
 from typing import Any
 
 import questionary
 import typer
 
-from . import ui
+from . import draft, ui
+from .detect import Detected, detect
 from .models import AGENTS, LAYOUTS, MCP_SERVERS, ROLES, STACKS, Answers, Service, Stack, Workspace
 
 # The "Other (not listed)" language choice, which then asks for file extensions.
 OTHER_LANGUAGE = "other"
+
+# Drafting with Cohere is on when this key is set (and the optional `cohere` package is installed).
+API_KEY_ENV = "CO_API_KEY"
+MODEL_ENV = "AGENT_SCAFFOLD_COHERE_MODEL"
 
 
 def _choices(catalog: dict[str, Any], label: Any, checked: tuple[str, ...] = ()) -> list[questionary.Choice]:
@@ -146,13 +153,70 @@ def _shared_questions(p: Answers | Workspace | None, default_agents: tuple[str, 
     return {"mcp_servers": mcp_servers, "agents": agents, "block_dangerous": block_dangerous}
 
 
-def interview(default_name: str, previous: Answers | None = None) -> Answers:
-    """Ask about one project. With `previous`, every question starts at its old answer so Enter keeps it."""
-    project = _project_questions(default_name, previous)
+def _scan(root: Path) -> Detected:
+    if not root.is_dir():
+        return Detected()
+    names = {entry.name for entry in root.iterdir() if entry.is_file()}
+    return detect(names, lambda name: (root / name).read_text())
+
+
+def _drafter() -> draft.Drafter | None:
+    key = os.environ.get(API_KEY_ENV)
+    if not key:
+        return None
+    try:
+        return draft.cohere_drafter(key, os.environ.get(MODEL_ENV) or draft.DEFAULT_MODEL)
+    except ImportError:
+        typer.secho(
+            f"{API_KEY_ENV} is set, but the Cohere package isn't installed, so answers won't be drafted. "
+            "Install it with: uv tool install 'agent-scaffold[cohere]'\n",
+            fg=typer.colors.YELLOW,
+        )
+        return None
+
+
+def starting_answers(name: str, root: Path | None, noun: str = "project") -> Answers | None:
+    """Answers to start a fresh interview from: what the folder's package.json or pyproject.toml says and, when a
+    Cohere API key is set, a draft from the person's description. None when there's nothing to go on."""
+    detected = _scan(root) if root else Detected()
+    found = f" and {' and '.join(detected.sources)}" if detected else ""
+    description = ""
+    drafter = _drafter()
+    if drafter:
+        description = ui.ask(
+            questionary.text(
+                f"Describe the {noun} in a few sentences, and Cohere drafts your answers from it{found}. "
+                "Only the description and the names of dependencies and commands are sent (Enter to skip):\n"
+            )
+        ).strip()
+    if description and drafter:
+        typer.echo("Asking Cohere for a draft...")
+        try:
+            answers = draft.parse(
+                drafter(draft.system_prompt(), draft.user_prompt(description, detected)), name, description, detected
+            )
+        except Exception as e:  # any API, network or format failure: carry on without the draft
+            typer.secho(f"Couldn't get a draft ({e}); continuing without it.\n", fg=typer.colors.YELLOW)
+        else:
+            typer.secho(
+                "Each question below starts with Cohere's suggestion. Check them: Enter keeps one, or type over it.\n",
+                fg=typer.colors.GREEN,
+            )
+            return answers
+    if detected:
+        typer.echo(f"Found {' and '.join(detected.sources)}: the questions start with what it says.\n")
+    return draft.from_detected(name, description, detected)
+
+
+def interview(default_name: str, previous: Answers | None = None, root: Path | None = None) -> Answers:
+    """Ask about one project. With `previous`, every question starts at its old answer so Enter keeps it; otherwise
+    they start from the project folder and, if enabled, a Cohere draft."""
+    start = previous or starting_answers(default_name, root)
+    project = _project_questions(default_name, start)
     return Answers(**project, **_shared_questions(previous, ROLES[project["role"]].agents))
 
 
-def service_interview(previous: Service | None = None, folder: str = "") -> Service:
+def service_interview(previous: Service | None = None, folder: str = "", root: Path | None = None) -> Service:
     """Ask about one service of a workspace: its folder, then the same questions as a project minus the shared ones."""
     path = ui.ask(
         questionary.text(
@@ -161,11 +225,15 @@ def service_interview(previous: Service | None = None, folder: str = "") -> Serv
             validate=lambda v: bool(v.strip()) or "Enter a folder name",
         )
     )
-    project = _project_questions(posixpath.basename(path.strip("/")), previous.answers if previous else None, "service")
+    name = posixpath.basename(path.strip("/"))
+    start = (
+        previous.answers if previous else starting_answers(name, root / path.strip("/") if root else None, "service")
+    )
+    project = _project_questions(name, start, "service")
     return Service(path, Answers(**project))
 
 
-def workspace_interview(default_name: str, previous: Workspace | None = None) -> Workspace:
+def workspace_interview(default_name: str, previous: Workspace | None = None, root: Path | None = None) -> Workspace:
     """Ask about a system of services: its goal and layout, each service, then the choices they all share."""
     p = previous
     name = ui.ask(questionary.text("Workspace (system) name:", default=p.name if p else default_name))
@@ -188,7 +256,7 @@ def workspace_interview(default_name: str, previous: Workspace | None = None) ->
     while ui.ask(questionary.confirm(question, default=len(services) < len(p.services) if p else False)):
         before = p.services[len(services)] if p and len(services) < len(p.services) else None
         typer.echo(f"\nService {len(services) + 1}")
-        services.append(service_interview(before))
+        services.append(service_interview(before, root=root))
         question = "Add another service?"
     communication = ui.ask(
         questionary.text("How do the services talk to each other? (optional):", default=p.communication if p else "")
@@ -212,10 +280,12 @@ def workspace_interview(default_name: str, previous: Workspace | None = None) ->
     )
 
 
-def new_answers(default_name: str, previous: Answers | Workspace | None = None) -> Answers | Workspace:
+def new_answers(
+    default_name: str, previous: Answers | Workspace | None = None, root: Path | None = None
+) -> Answers | Workspace:
     """Interview for a project or a workspace. Editing keeps the previous kind; starting fresh asks which."""
     if isinstance(previous, Workspace):
-        return workspace_interview(default_name, previous)
+        return workspace_interview(default_name, previous, root)
     if previous is None:
         kind = ui.ask(
             questionary.select(
@@ -227,5 +297,5 @@ def new_answers(default_name: str, previous: Answers | Workspace | None = None) 
             )
         )
         if kind == "workspace":
-            return workspace_interview(default_name)
-    return interview(default_name, previous)
+            return workspace_interview(default_name, root=root)
+    return interview(default_name, previous, root)

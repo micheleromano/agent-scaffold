@@ -95,7 +95,7 @@ def test_nothing_to_write_skips_the_confirmation(project: Path, answers_file: Pa
 
 
 def test_answers_are_saved_even_when_declined(monkeypatch: pytest.MonkeyPatch, project: Path) -> None:
-    monkeypatch.setattr(questions, "interview", lambda _name, _previous=None: make_answers())
+    monkeypatch.setattr(questions, "interview", lambda _name, _previous=None, _root=None: make_answers())
     monkeypatch.setattr(ui, "ask", replies("project", False))
     result = runner.invoke(app, ["init", str(project)])
     assert result.exit_code == 0, result.output
@@ -106,7 +106,7 @@ def test_answers_are_saved_even_when_declined(monkeypatch: pytest.MonkeyPatch, p
 def test_use_saved_answers_as_they_are(monkeypatch: pytest.MonkeyPatch, project: Path) -> None:
     save(project, make_answers())
 
-    def no_interview(_name: str, _previous: Answers | None = None) -> Answers:
+    def no_interview(_name: str, _previous: Answers | None = None, _root: Path | None = None) -> Answers:
         raise AssertionError("'Use them as they are' should skip the interview")
 
     monkeypatch.setattr(questions, "interview", no_interview)
@@ -125,7 +125,7 @@ def test_edit_prefills_the_interview_and_start_over_does_not(
     saved = save(project, make_answers(name="old"))
     seen: list[Answers | None] = []
 
-    def fake_interview(_name: str, previous: Answers | None = None) -> Answers:
+    def fake_interview(_name: str, previous: Answers | None = None, _root: Path | None = None) -> Answers:
         seen.append(previous)
         return make_answers(name="new")
 
@@ -156,7 +156,7 @@ def test_saved_answers_are_kept_per_directory(tmp_path: Path) -> None:
 
 
 def test_save_answers_option_writes_a_copy(monkeypatch: pytest.MonkeyPatch, project: Path, tmp_path: Path) -> None:
-    monkeypatch.setattr(questions, "interview", lambda _name, _previous=None: make_answers())
+    monkeypatch.setattr(questions, "interview", lambda _name, _previous=None, _root=None: make_answers())
     monkeypatch.setattr(ui, "ask", replies("project"))
     copy = tmp_path / "copy.json"
     runner.invoke(app, ["init", str(project), "--save-answers", str(copy), "--yes"])
