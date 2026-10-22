@@ -18,6 +18,12 @@ from .helpers import MINIMAL, FakeQuestion, make_answers
 runner = CliRunner()
 
 
+def plain(output: str) -> str:
+    """Typer's error box without colors, borders or line wrapping, which vary with the terminal (e.g. on CI)."""
+    text = re.sub(r"\x1b\[[0-9;]*m", "", output)
+    return " ".join(text.replace("│", " ").split())
+
+
 @pytest.fixture
 def answers_file(tmp_path: Path) -> Path:
     path = tmp_path / "answers.json"
@@ -388,7 +394,7 @@ def test_a_file_path_is_rejected(tmp_path: Path, answers_file: Path) -> None:
     target.write_text("")
     result = runner.invoke(app, ["init", str(target), "--answers", str(answers_file)])
     assert result.exit_code != 0
-    assert "is a file, not a directory" in result.output
+    assert "is a file, not a directory" in plain(result.output)
 
 
 # --- summary and prompts ------------------------------------------------------------------
