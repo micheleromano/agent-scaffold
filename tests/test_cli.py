@@ -229,8 +229,8 @@ def test_interview_builds_answers(monkeypatch: pytest.MonkeyPatch, project: Path
         "A shop.",  # description
         "other",  # role
         True,  # languages known
-        [],  # preset languages
-        "ex, exs",  # other extensions
+        ["other"],  # languages: "Other (not listed)"
+        "ex, exs",  # its file extensions
         "Phoenix",  # frameworks
         "",  # architecture
         "",  # conventions

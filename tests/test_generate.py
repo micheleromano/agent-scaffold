@@ -291,3 +291,17 @@ def test_llm_rule_covers_evals_and_untrusted_output() -> None:
     rule = files_by_path(make_answers(role="llm"))[".claude/rules/llm.md"]
     assert "run the eval set" in rule
     assert "untrusted input" in rule
+
+
+def test_conventions_render_as_bullets() -> None:
+    rules = "Use react-router loaders instead of `useEffect`; Never edit files in src/generated: run codegen"
+    agents = files_by_path(make_answers(conventions=rules))["AGENTS.md"]
+    section = agents.split("## Conventions\n\n")[1].split("\n\n")[0]
+    assert section == (
+        "- Use react-router loaders instead of `useEffect`\n- Never edit files in src/generated: run codegen"
+    )
+
+
+def test_missing_conventions_leave_a_helpful_todo() -> None:
+    agents = files_by_path(make_answers(conventions=""))["AGENTS.md"]
+    assert 'TODO: rules an agent wouldn\'t guess, e.g. "prefer react-router loaders over useEffect".' in agents

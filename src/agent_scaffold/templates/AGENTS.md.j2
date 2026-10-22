@@ -51,6 +51,10 @@ Not decided yet. Before writing application code, help the user choose the langu
 
 ## Conventions
 
-{{ a.conventions or "TODO: list the conventions a new contributor gets wrong most often." }}
+{% for rule in a.convention_list %}
+- {{ rule }}
+{% else %}
+TODO: rules an agent wouldn't guess, e.g. "prefer react-router loaders over useEffect".
+{% endfor %}
 
 {% include "_principles.md.j2" %}

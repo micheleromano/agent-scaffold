@@ -274,7 +274,6 @@ def test_init_a_workspace_from_the_interview(monkeypatch: pytest.MonkeyPatch, tm
             "backend",  # role
             True,  # languages known
             ["typescript"],  # languages
-            "",  # extensions
             "",  # frameworks
             "",  # architecture
             "",  # conventions
@@ -330,7 +329,7 @@ def test_add_service_updates_the_manifest_and_the_services_table(
     monkeypatch.setattr(
         cli,
         "_ask",
-        replies("data", "data", "", "data", True, ["python"], "", "", "", "", "", "", "pytest", "", "", True),
+        replies("data", "data", "", "data", True, ["python"], "", "", "", "", "", "pytest", "", "", True),
     )
     result = runner.invoke(app, ["add-service", "data", "--workspace", str(root)])
 

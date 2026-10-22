@@ -86,7 +86,7 @@ Sections that depend on the list of services (the services table, the `/review` 
 
 ## Any stack
 
-Presets fill in default test, lint and format commands for TypeScript/JavaScript, Python, Go, Rust, Java/Kotlin, C#, Ruby, PHP and Swift. For any other language, enter its file extensions (e.g. `ex, exs`), and rules and hooks are scoped to those files. Every command can be edited or left blank, and blank answers are left out of the output.
+Presets fill in default test, lint and format commands for TypeScript/JavaScript, Python, Go, Rust, Java/Kotlin, C#, Ruby, PHP and Swift. For any other language, tick "Other (not listed)" and enter its file extensions (e.g. `ex, exs` for Elixir, `html, css` for a static site); rules and hooks are then scoped to those files. Every command can be edited or left blank, and blank answers are left out of the output.
 
 Don't know the stack yet? Answer "no" to "Do you know which languages it will use?" and the interview skips the language and command questions. `AGENTS.md` records the stack as not decided, and a `/choose-stack` skill asks Claude to explore the idea with you, propose 2 or 3 stacks with trade-offs, and, once you pick, fill in the stack, commands, rule paths and permissions.
 

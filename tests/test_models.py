@@ -77,3 +77,15 @@ def test_every_role_is_complete(key: str) -> None:
     assert role.label
     assert role.default_stack is None or role.default_stack in STACKS
     assert set(role.agents) <= set(AGENTS)
+
+
+@pytest.mark.parametrize(
+    ("conventions", "rules"),
+    [
+        ("", []),
+        ("Use loaders; never edit generated files", ["Use loaders", "never edit generated files"]),
+        ("  one ;\n two\n\n; ", ["one", "two"]),
+    ],
+)
+def test_conventions_split_into_rules(conventions: str, rules: list[str]) -> None:
+    assert make_answers(conventions=conventions).convention_list == rules

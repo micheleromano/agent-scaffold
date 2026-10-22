@@ -29,6 +29,9 @@ from .writer import plan, write
 
 app = typer.Typer(help="Set up the agent files for a project, or for a system of services.", no_args_is_help=True)
 
+# The "Other (not listed)" language choice, which then asks for file extensions.
+OTHER_LANGUAGE = "other"
+
 ACTION_STYLE = {
     "create": ("+", typer.colors.GREEN),
     "overwrite": ("~", typer.colors.YELLOW),
@@ -105,7 +108,7 @@ def summarize(x: Answers | Workspace) -> list[tuple[str, str]]:
             ("Languages", _languages(x)),
             ("Frameworks", x.frameworks),
             ("Architecture", x.architecture),
-            ("Conventions", x.conventions),
+            ("Conventions", "; ".join(x.convention_list)),
             ("Commands", _commands(x)),
             *_shared_rows(x),
         ]
@@ -158,19 +161,26 @@ def _project_questions(default_name: str, p: Answers | None, noun: str = "projec
     extensions_text = frameworks = install_cmd = dev_cmd = test_cmd = lint_cmd = format_cmd = ""
     format_on_edit = False
     if not stack_undecided:
-        stacks = _ask(
+        picked = _ask(
             questionary.checkbox(
-                "Languages with presets:",
-                choices=_choices(STACKS, lambda s: s.label, checked=_default_stacks(p, role)),
+                "Languages:",
+                choices=[
+                    *_choices(STACKS, lambda s: s.label, checked=_default_stacks(p, role)),
+                    questionary.Choice("Other (not listed)", value=OTHER_LANGUAGE, checked=bool(p and p.extensions)),
+                ],
+                validate=lambda v: bool(v) or "Pick at least one",
             )
         )
-        extensions_text = _ask(
-            questionary.text(
-                "File extensions for other languages, comma separated (e.g. ex, exs):",
-                default=", ".join(p.extensions) if p else "",
-                validate=lambda v: bool(stacks or v.strip()) or "Pick a language above or enter an extension",
+        stacks = [k for k in picked if k != OTHER_LANGUAGE]
+        if OTHER_LANGUAGE in picked:
+            # Rules and the format hook are scoped by file extension, so an unlisted language needs its own.
+            extensions_text = _ask(
+                questionary.text(
+                    "Which file extensions does it use? (e.g. ex, exs for Elixir; html, css for a static site):",
+                    default=", ".join(p.extensions) if p else "",
+                    validate=lambda v: bool(v.strip()) or "Enter at least one extension",
+                )
             )
-        )
         primary = STACKS[stacks[0]] if stacks else None
         frameworks = _ask(
             questionary.text("Main frameworks and libraries (optional):", default=p.frameworks if p else "")
@@ -179,7 +189,11 @@ def _project_questions(default_name: str, p: Answers | None, noun: str = "projec
         questionary.text("Architecture in a sentence or two (optional):", default=p.architecture if p else "")
     )
     conventions = _ask(
-        questionary.text("Conventions people get wrong most often (optional):", default=p.conventions if p else "")
+        questionary.text(
+            'Rules an AI agent might not guess for this project, separated by ";" (optional).\n'
+            "  E.g. Use react-router loaders instead of useEffect for data fetching; never edit generated files\n",
+            default=p.conventions if p else "",
+        )
     )
     if not stack_undecided:
         # Keep earlier commands exactly (even blank ones); otherwise suggest the first language's preset.

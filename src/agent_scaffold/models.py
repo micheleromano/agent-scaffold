@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, field, replace
 from typing import Any
 
@@ -208,6 +209,11 @@ class Answers:
     def test_globs(self) -> list[str]:
         custom = [f"**/*{word}*.{e}" for e in self.extensions for word in ("test", "spec")]
         return [g for s in self.stacks for g in STACKS[s].test_globs] + custom
+
+    @property
+    def convention_list(self) -> list[str]:
+        """The project's own rules, one per item: the answer is split on ";" and newlines."""
+        return [rule.strip() for rule in re.split(r"[;\n]", self.conventions) if rule.strip()]
 
     @property
     def languages(self) -> list[str]:
