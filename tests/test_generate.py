@@ -305,3 +305,11 @@ def test_conventions_render_as_bullets() -> None:
 def test_missing_conventions_leave_a_helpful_todo() -> None:
     agents = files_by_path(make_answers(conventions=""))["AGENTS.md"]
     assert 'TODO: rules an agent wouldn\'t guess, e.g. "prefer react-router loaders over useEffect".' in agents
+
+
+def test_npx_mcp_servers_are_pinned_to_a_version() -> None:
+    for key, server in MCP_SERVERS.items():
+        for arg in server.config.get("args", []):
+            if arg.startswith("@") and arg.count("@") == 2:
+                version = arg.rsplit("@", 1)[1]
+                assert version[0].isdigit(), f"{key} must pin an exact version, not {version!r}"

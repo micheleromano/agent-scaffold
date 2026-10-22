@@ -100,9 +100,10 @@ MCP_SERVERS: dict[str, McpServer] = {
     "sentry": McpServer("Sentry", {"type": "http", "url": "https://mcp.sentry.dev/mcp"}),
     "notion": McpServer("Notion", {"type": "http", "url": "https://mcp.notion.com/mcp"}),
     "slack": McpServer("Slack", {"type": "http", "url": "https://mcp.slack.com/mcp"}),
+    # npx packages are pinned so every start runs the version that was chosen, not whatever was published last.
     "playwright": McpServer(
         "Playwright (browser testing)",
-        {"command": "npx", "args": ["-y", "@playwright/mcp@latest"]},
+        {"command": "npx", "args": ["-y", "@playwright/mcp@0.0.83"]},
     ),
 }
 
