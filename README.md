@@ -8,6 +8,14 @@ Answer a few questions about a project and get a working Claude Code setup: inst
 uv run agent-scaffold init path/to/project
 ```
 
+Cohere drafts the setup from a short description:
+
+![Terminal: a service described in a few sentences, then "Cohere suggests:" with a drafted role, languages, framework, architecture, conventions and commands, and a one-line reason for the languages.](docs/images/agent-scaffold-cohere-draft.png)
+
+…and agent-scaffold writes a complete Claude Code setup:
+
+![Terminal: the list of files to create for the workspace and its backend service (CLAUDE.md, AGENTS.md, settings, rules, skills, subagents and hooks), and the answer "Yes" to "Write these files?".](docs/images/agent-scaffold-files-written.png)
+
 ## What it writes
 
 | File | Purpose |
